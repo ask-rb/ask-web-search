@@ -1,10 +1,13 @@
 require "ask/tools"
 require "net/http"
 require "uri"
+require "json"
 
 module Ask
   module Tools
     class WebSearch < Ask::Tool
+      SEARXNG_URL = ENV.fetch("SEARXNG_URL", "http://localhost:8888")
+
       description "Search the web for current information. Use this to get up-to-date results, recent events, or facts that may have changed."
 
       params(
@@ -23,27 +26,27 @@ module Ask
       private
 
       def search(query)
-        uri = URI("https://lite.duckduckgo.com/lite/")
+        uri = URI("#{SEARXNG_URL}/search?q=#{URI.encode_www_form_component(query)}&format=json")
         http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl = true
-        req = Net::HTTP::Post.new(uri)
-        req.set_form_data("q" => query)
-        req["User-Agent"] = "Mozilla/5.0"
+        http.open_timeout = 5
+        http.read_timeout = 10
+        req = Net::HTTP::Get.new(uri)
+        req["User-Agent"] = "ask-web-search/1.0"
         res = http.request(req)
-        parse_results(res.body.force_encoding("UTF-8"))
+        raise "SearXNG returned #{res.code}: #{res.body}" unless res.code.start_with?("2")
+
+        data = JSON.parse(res.body)
+        parse_results(data)
       end
 
-      def parse_results(html)
+      def parse_results(data)
         results = []
-
-        html.scan(/<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/m) do |url, title|
-          next if url.start_with?("#")
-          next if url.include?("duckduckgo.com")
-          clean_title = title.strip
-          next if clean_title.empty?
-          results << { url: url, title: clean_title }
+        data.fetch("results", []).each do |r|
+          results << { url: r["url"], title: r["title"], content: r["content"] }
         end
-
+        data.fetch("infoboxes", []).each do |ib|
+          results << { url: ib["id"], title: ib["infobox"], content: ib["content"] }
+        end
         results.uniq { |r| r[:url] }
       end
 
@@ -51,7 +54,10 @@ module Ask
         return "No results found." if results.empty?
 
         results.each_with_index.map do |r, i|
-          "#{i + 1}. #{r[:title]}\n   #{r[:url]}"
+          line = "#{i + 1}. #{r[:title]}"
+          line += "\n   #{r[:url]}"
+          line += "\n   #{r[:content]}" if r[:content] && !r[:content].empty?
+          line
         end.join("\n\n")
       end
     end

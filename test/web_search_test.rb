@@ -27,48 +27,95 @@ describe Ask::Tools::WebSearch do
     _(tool).must_be_kind_of Ask::Tools::WebSearch
   end
 
-  describe "parsing" do
-    it "extracts links from DDG lite HTML" do
-      html = <<~HTML
-        <a rel="nofollow" href="https://example.com/page1">Result One</a>
-        <a rel="nofollow" href="https://example.com/page2">Result Two</a>
-      HTML
-      results = @tool.send(:parse_results, html)
+  describe "SearXNG JSON parsing" do
+    it "extracts results from JSON response" do
+      data = {
+        "results" => [
+          { "url" => "https://example.com/1", "title" => "Result One", "content" => "Description one" },
+          { "url" => "https://example.com/2", "title" => "Result Two", "content" => "Description two" }
+        ]
+      }
+      results = @tool.send(:parse_results, data)
       _(results.length).must_equal 2
-      _(results[0][:url]).must_equal "https://example.com/page1"
+      _(results[0][:url]).must_equal "https://example.com/1"
       _(results[0][:title]).must_equal "Result One"
     end
 
-    it "filters out DDG internal links" do
-      html = <<~HTML
-        <a href="https://duckduckgo.com/about">About</a>
-        <a rel="nofollow" href="https://example.com">Real Result</a>
-        <a href="#top">Top</a>
-      HTML
-      results = @tool.send(:parse_results, html)
+    it "extracts infoboxes from JSON response" do
+      data = {
+        "results" => [],
+        "infoboxes" => [
+          { "id" => "https://wiki.example.com", "infobox" => "Topic", "content" => "Description" }
+        ]
+      }
+      results = @tool.send(:parse_results, data)
       _(results.length).must_equal 1
-      _(results[0][:url]).must_equal "https://example.com"
+      _(results[0][:url]).must_equal "https://wiki.example.com"
+      _(results[0][:title]).must_equal "Topic"
     end
 
     it "deduplicates by URL" do
-      html = <<~HTML
-        <a rel="nofollow" href="https://example.com">First</a>
-        <a rel="nofollow" href="https://example.com">First (dup)</a>
-        <a rel="nofollow" href="https://other.com">Other</a>
-      HTML
-      results = @tool.send(:parse_results, html)
+      data = {
+        "results" => [
+          { "url" => "https://example.com", "title" => "First", "content" => "" },
+          { "url" => "https://example.com", "title" => "First (dup)", "content" => "" },
+          { "url" => "https://other.com", "title" => "Other", "content" => "" }
+        ]
+      }
+      results = @tool.send(:parse_results, data)
       _(results.length).must_equal 2
+    end
+
+    it "handles empty results" do
+      data = { "results" => [] }
+      results = @tool.send(:parse_results, data)
+      _(results).must_be :empty?
+    end
+
+    it "handles missing results key" do
+      results = @tool.send(:parse_results, {})
+      _(results).must_be :empty?
+    end
+
+    it "handles nil values in results" do
+      data = {
+        "results" => [
+          { "url" => nil, "title" => nil, "content" => nil }
+        ]
+      }
+      results = @tool.send(:parse_results, data)
+      _(results.length).must_equal 1
+      assert_nil results[0][:url]
+    end
+
+    it "handles missing fields in results" do
+      data = {
+        "results" => [
+          { "url" => "https://example.com" }
+        ]
+      }
+      results = @tool.send(:parse_results, data)
+      _(results.length).must_equal 1
+      assert_nil results[0][:title]
     end
   end
 
   describe "formatting" do
     it "formats results as numbered list with URLs" do
       results = [
-        { url: "https://example.com", title: "Example" },
-        { url: "https://test.com", title: "Test" }
+        { url: "https://example.com", title: "Example", content: "" },
+        { url: "https://test.com", title: "Test", content: "" }
       ]
       formatted = @tool.send(:format_results, results)
       _(formatted).must_equal "1. Example\n   https://example.com\n\n2. Test\n   https://test.com"
+    end
+
+    it "includes content when present" do
+      results = [
+        { url: "https://example.com", title: "Example", content: "An example site" }
+      ]
+      formatted = @tool.send(:format_results, results)
+      _(formatted).must_include "An example site"
     end
 
     it "returns no results message for empty list" do
@@ -78,10 +125,10 @@ describe Ask::Tools::WebSearch do
   end
 
   describe "search" do
-    it "returns results from duckduckgo with URLs" do
+    it "returns results from SearXNG with URLs" do
       result = @tool.execute(query: "ruby programming language")
       _(result).must_be_kind_of String
-      skip "DuckDuckGo rate-limited this test run" if result == "No results found."
+      _(result).wont_equal "No results found."
       _(result).must_match(%r{https?://})
     end
   end

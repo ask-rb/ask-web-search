@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
 
   spec.summary = "Web search tool for the ask-rb ecosystem"
   spec.description = "Provides Ask::Tools::WebSearch, a tool that searches the web " \
-                     "via DuckDuckGo (no API key required). Works with any ask-rb " \
-                     "chat or agent. Swap to Brave/Firecrawl/etc. via the adapter interface."
+                     "via SearXNG (local instance). Works with any ask-rb " \
+                     "chat or agent. Configure endpoint via SEARXNG_URL env var."
   spec.homepage = "https://github.com/ask-rb/ask-web-search"
   spec.license = "MIT"
 
