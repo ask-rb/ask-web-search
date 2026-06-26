@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    ask-web-search (0.2.0)
+    ask-web-search (0.2.1)
       ask-tools (>= 0.1)
 
 GEM
@@ -25,7 +25,7 @@ DEPENDENCIES
 CHECKSUMS
   ask-schema (0.1.0) sha256=ae24b2d7e63227c760457daae41b265382acbf62eb48e15ab3cf636af8a84246
   ask-tools (0.2.2) sha256=8630a5849b9dff3ff97ad240411b37ad752366cc2867e1f7add9886fdf15dbc5
-  ask-web-search (0.2.0)
+  ask-web-search (0.2.1)
   bundler (4.0.12) sha256=7f8b757d28dfb636e7b24fba2344ac6dd13b5b24f4b46d62573d483f211825ac
   minitest (5.27.0) sha256=2d3b17f8a36fe7801c1adcffdbc38233b938eb0b4966e97a6739055a45fa77d5
   rake (13.4.2) sha256=cb825b2bd5f1f8e91ca37bddb4b9aaf345551b4731da62949be002fa89283701

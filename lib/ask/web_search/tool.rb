@@ -1,4 +1,4 @@
-require "ask/tools"
+require "ask-tools"
 require "net/http"
 require "uri"
 require "json"
@@ -20,7 +20,7 @@ module Ask
 
       def execute(query:)
         results = search(query)
-        format_results(results)
+        Ask::Result.ok(data: format_results(results))
       end
 
       private

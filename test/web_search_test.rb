@@ -126,10 +126,11 @@ describe Ask::Tools::WebSearch do
 
   describe "search" do
     it "returns results from SearXNG with URLs" do
-      result = @tool.execute(query: "ruby programming language")
-      _(result).must_be_kind_of String
-      _(result).wont_equal "No results found."
-      _(result).must_match(%r{https?://})
+      result = @tool.call("query" => "ruby programming language")
+      _(result).must_be_kind_of Ask::Result
+      _(result.output).must_be_kind_of String
+      _(result.output).wont_equal "No results found."
+      _(result.output).must_match(%r{https?://})
     end
   end
 end
