@@ -1,0 +1,201 @@
+---
+http_interactions:
+- request:
+    method: get
+    uri: http://localhost:8888/search?format=json&q=ruby%20programming%20language
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+      Host:
+      - localhost:8888
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Content-Type:
+      - application/json
+      Content-Length:
+      - '13313'
+      Server-Timing:
+      - total;dur=2093.759, render;dur=0, total_0_wikipedia;dur=1186.647, total_1_duckduckgo
+        web;dur=1710.163, total_2_duckduckgo;dur=2091.928, load_0_wikipedia;dur=1181.032,
+        load_1_duckduckgo web;dur=1676.072, load_2_duckduckgo;dur=2077.317
+      Server:
+      - granian
+      Date:
+      - Fri, 26 Jun 2026 18:48:16 GMT
+    body:
+      encoding: UTF-8
+      string: '{"query": "ruby programming language", "results": [{"template": "default.html",
+        "title": "Ruby Programming Language", "content": "Ruby has a simple and intuitive
+        syntax that reads like natural language. By eliminating complex symbols and
+        verbose constructs, Ruby''s design philosophy allows you to express what you
+        want directly. With minimal boilerplate and high readability, it''s friendly
+        to beginners and maintainable for experienced developers.", "img_src": "",
+        "iframe_src": "", "audio_src": "", "thumbnail": "", "publishedDate": null,
+        "pubdate": "", "length": null, "views": "", "author": "", "metadata": "",
+        "priority": "", "engines": ["duckduckgo", "duckduckgo web"], "open_group":
+        false, "close_group": false, "positions": [1, 1], "score": 4.0, "category":
+        "general", "url": "https://www.ruby-lang.org/en/", "engine": "duckduckgo web",
+        "parsed_url": ["https", "www.ruby-lang.org", "/en/", "", "", ""]}, {"template":
+        "default.html", "title": "Ruby (programming language) - Wikipedia", "content":
+        "Ruby is a general-purpose programming language designed with an emphasis
+        on programming productivity and simplicity. In Ruby, everything is an object,
+        including primitive data types. Development of the language began in the mid-1990s
+        by Yukihiro \"Matz\" Matsumoto in Japan. Ruby is interpreted, high-level,
+        and dynamically typed; its interpreter uses garbage collection and just-in-time
+        ...", "img_src": "", "iframe_src": "", "audio_src": "", "thumbnail": "", "publishedDate":
+        null, "pubdate": "", "length": null, "views": "", "author": "", "metadata":
+        "", "priority": "", "engines": ["duckduckgo", "duckduckgo web"], "open_group":
+        false, "close_group": false, "positions": [2, 2], "score": 2.0, "category":
+        "general", "url": "https://en.wikipedia.org/wiki/Ruby_(programming_language)",
+        "engine": "duckduckgo web", "parsed_url": ["https", "en.wikipedia.org", "/wiki/Ruby_(programming_language)",
+        "", "", ""]}, {"template": "default.html", "title": "Ruby Programming Language
+        - GeeksforGeeks", "content": "Ruby is a popular backend programming language,
+        widely used for building modern applications and services. It makes development
+        faster, easier, and more productive compared to many other languages. Ruby
+        gained worldwide recognition through Ruby on Rails, a framework that revolutionized
+        web development by enabling startups and enterprises to build and scale full-stack
+        applications quickly ...", "img_src": "", "iframe_src": "", "audio_src": "",
+        "thumbnail": "", "publishedDate": null, "pubdate": "", "length": null, "views":
+        "", "author": "", "metadata": "", "priority": "", "engines": ["duckduckgo",
+        "duckduckgo web"], "open_group": false, "close_group": false, "positions":
+        [3, 3], "score": 1.3333333333333333, "category": "general", "url": "https://www.geeksforgeeks.org/ruby/ruby-programming-language/",
+        "engine": "duckduckgo web", "parsed_url": ["https", "www.geeksforgeeks.org",
+        "/ruby/ruby-programming-language/", "", "", ""]}, {"template": "default.html",
+        "title": "Ruby Tutorial", "content": "Ruby is an open-source and high-level
+        programming language, which is known for its simplicity and developer-friendliness.
+        This is designed by Yukihiro Matsumoto with the purpose of making programming
+        more enjoyable and productive for developers.", "img_src": "", "iframe_src":
+        "", "audio_src": "", "thumbnail": "", "publishedDate": null, "pubdate": "",
+        "length": null, "views": "", "author": "", "metadata": "", "priority": "",
+        "engines": ["duckduckgo", "duckduckgo web"], "open_group": false, "close_group":
+        false, "positions": [5, 4], "score": 0.9, "category": "general", "url": "https://www.tutorialspoint.com/ruby/index.htm",
+        "engine": "duckduckgo web", "parsed_url": ["https", "www.tutorialspoint.com",
+        "/ruby/index.htm", "", "", ""]}, {"template": "default.html", "title": "Ruby
+        | Programming Language, Matsumoto Matz Yukihiro, Uses, Examples ...", "content":
+        "Ruby is a general-purpose and fully object-oriented computer programming
+        language known for its programmer-friendly design and supportive community.
+        Ruby became significantly popular between 2005 and 2009, largely because of
+        the release of the derivative web framework Ruby on Rails, but since has assumed
+        a role as a moderately popular language primarily employed for web development.",
+        "img_src": "", "iframe_src": "", "audio_src": "", "thumbnail": "", "publishedDate":
+        null, "pubdate": "", "length": null, "views": "", "author": "", "metadata":
+        "", "priority": "", "engines": ["duckduckgo", "duckduckgo web"], "open_group":
+        false, "close_group": false, "positions": [7, 5], "score": 0.6857142857142857,
+        "category": "general", "url": "https://www.britannica.com/technology/Ruby-programming-language",
+        "engine": "duckduckgo web", "parsed_url": ["https", "www.britannica.com",
+        "/technology/Ruby-programming-language", "", "", ""]}, {"template": "default.html",
+        "title": "The Ruby Programming Language - GitHub", "content": "This is the
+        home of the official Ruby programming language and its ecosystem on GitHub
+        \u2014 including the interpreter, standard libraries, default gems, and developer
+        tools.", "img_src": "", "iframe_src": "", "audio_src": "", "thumbnail": "",
+        "publishedDate": null, "pubdate": "", "length": null, "views": "", "author":
+        "", "metadata": "", "priority": "", "engines": ["duckduckgo", "duckduckgo
+        web"], "open_group": false, "close_group": false, "positions": [6, 7], "score":
+        0.6190476190476191, "category": "general", "url": "https://github.com/ruby",
+        "engine": "duckduckgo web", "parsed_url": ["https", "github.com", "/ruby",
+        "", "", ""]}, {"template": "default.html", "title": "Learn Ruby | Codecademy",
+        "content": "Learn Ruby, a powerful, easy-to-read programming language used
+        in web development. This course covers fundamental programming concepts, including
+        variables, loops, and control flow, and introduces you to object-oriented
+        programming.", "img_src": "", "iframe_src": "", "audio_src": "", "thumbnail":
+        "", "publishedDate": null, "pubdate": "", "length": null, "views": "", "author":
+        "", "metadata": "", "priority": "", "engines": ["duckduckgo", "duckduckgo
+        web"], "open_group": false, "close_group": false, "positions": [10, 6], "score":
+        0.5333333333333333, "category": "general", "url": "https://www.codecademy.com/learn/learn-ruby",
+        "engine": "duckduckgo web", "parsed_url": ["https", "www.codecademy.com",
+        "/learn/learn-ruby", "", "", ""]}, {"template": "default.html", "title": "Download
+        Ruby | Ruby - Ruby Programming Language", "content": "Here you can get the
+        latest Ruby distributions in your favorite flavor.The current stable version
+        is {{ site.data.downloads.stable[0] }}.Please be sure to re...", "img_src":
+        "", "iframe_src": "", "audio_src": "", "thumbnail": "", "publishedDate": null,
+        "pubdate": "", "length": null, "views": "", "author": "", "metadata": "",
+        "priority": "", "engines": ["duckduckgo web"], "open_group": false, "close_group":
+        false, "positions": [4], "score": 0.25, "category": "general", "url": "https://www.ruby-lang.org/en/downloads/",
+        "engine": "duckduckgo web", "parsed_url": ["https", "www.ruby-lang.org", "/en/downloads/",
+        "", "", ""]}, {"template": "default.html", "title": "Ruby Programming Language
+        (Introduction) - GeeksforGeeks", "content": "Ruby is an interpreted scripting
+        language, the scripting languages are usually slower than compiled languages
+        therefore, Ruby is slower than many other languages. Applications: Ruby is
+        used to create web applications of different sorts. It is one of the hot technology
+        at present to create web applications.", "img_src": "", "iframe_src": "",
+        "audio_src": "", "thumbnail": "", "publishedDate": null, "pubdate": "", "length":
+        null, "views": "", "author": "", "metadata": "", "priority": "", "engines":
+        ["duckduckgo web"], "open_group": false, "close_group": false, "positions":
+        [8], "score": 0.125, "category": "general", "url": "https://www.geeksforgeeks.org/ruby/ruby-programming-language-introduction/",
+        "engine": "duckduckgo web", "parsed_url": ["https", "www.geeksforgeeks.org",
+        "/ruby/ruby-programming-language-introduction/", "", "", ""]}, {"template":
+        "default.html", "title": "Ruby-Doc.org: Documenting the Ruby Language", "content":
+        "The ruby-doc.org Ruby documentation project is an effort by the Ruby community
+        to provide complete and accurate documentation for the Ruby programming language.
+        Actual documentation belongs to the respective authors, who deserve your recognition
+        and praise. See a bug or omission in the API docs? Visit Documenting-ruby.org
+        Use Ruby. Be happy.", "img_src": "", "iframe_src": "", "audio_src": "", "thumbnail":
+        "", "publishedDate": null, "pubdate": "", "length": null, "views": "", "author":
+        "", "metadata": "", "priority": "", "engines": ["duckduckgo"], "open_group":
+        false, "close_group": false, "positions": [8], "score": 0.125, "category":
+        "general", "url": "https://ruby-doc.org/", "engine": "duckduckgo", "parsed_url":
+        ["https", "ruby-doc.org", "/", "", "", ""]}, {"template": "default.html",
+        "title": "What Is Ruby Used For? The Top 9 Uses for the Ruby Programming Language",
+        "content": "Wondering if you should learn Ruby over more common programming
+        languages like Python or JavaScript? Ruby is still one of the most popular
+        programming languages in the world due to its portability, flexibility, and
+        ease of use. Ruby (and the popular Ruby-based framework Ruby on Rails) powers
+        many of the web and e-commerce applications you use every day, including Twitch,
+        Soundcloud, Airbnb ...", "img_src": "", "iframe_src": "", "audio_src": "",
+        "thumbnail": "", "publishedDate": null, "pubdate": "", "length": null, "views":
+        "", "author": "", "metadata": "", "priority": "", "engines": ["duckduckgo
+        web"], "open_group": false, "close_group": false, "positions": [9], "score":
+        0.1111111111111111, "category": "general", "url": "https://www.wikihow.tech/What-Is-the-Ruby-Coding-Language-Used-for",
+        "engine": "duckduckgo web", "parsed_url": ["https", "www.wikihow.tech", "/What-Is-the-Ruby-Coding-Language-Used-for",
+        "", "", ""]}, {"template": "default.html", "title": "Ruby in Twenty Minutes
+        | Ruby - Ruby Programming Language", "content": "Ruby comes with a program
+        that will show the results of any Ruby statements you feed it. Playing with
+        Ruby code in interactive sessions like this is a terrific way to learn the
+        language.", "img_src": "", "iframe_src": "", "audio_src": "", "thumbnail":
+        "", "publishedDate": null, "pubdate": "", "length": null, "views": "", "author":
+        "", "metadata": "", "priority": "", "engines": ["duckduckgo"], "open_group":
+        false, "close_group": false, "positions": [9], "score": 0.1111111111111111,
+        "category": "general", "url": "https://www.ruby-lang.org/en/documentation/quickstart/",
+        "engine": "duckduckgo", "parsed_url": ["https", "www.ruby-lang.org", "/en/documentation/quickstart/",
+        "", "", ""]}, {"template": "default.html", "title": "Ruby Computer Language
+        Explained - ComputerCity", "content": "Ruby is a dynamic, open-source programming
+        language that''s designed to make coding not just powerful, but joyful. Created
+        by Yukihiro \"Matz\" Matsumoto in Japan in the mid-1990s, Ruby blends ideas
+        from his favorite languages \u2014 including Perl, Smalltalk, Eiffel, Ada,
+        and Lisp \u2014 into one cohesive, elegant syntax.", "img_src": "", "iframe_src":
+        "", "audio_src": "", "thumbnail": "", "publishedDate": null, "pubdate": "",
+        "length": null, "views": "", "author": "", "metadata": "", "priority": "",
+        "engines": ["duckduckgo"], "open_group": false, "close_group": false, "positions":
+        [10], "score": 0.1, "category": "general", "url": "https://computercity.com/software/ruby-computer-language-explained",
+        "engine": "duckduckgo", "parsed_url": ["https", "computercity.com", "/software/ruby-computer-language-explained",
+        "", "", ""]}], "answers": [{"url": "https://en.wikipedia.org/wiki/Ruby_(programming_language)",
+        "engine": "duckduckgo", "parsed_url": ["https", "en.wikipedia.org", "/wiki/Ruby_(programming_language)",
+        "", "", ""], "template": "answer/legacy.html", "answer": "Ruby is a general-purpose
+        programming language designed with an emphasis on programming productivity
+        and simplicity. In Ruby, everything is an object, including primitive data
+        types. Development of the language began in the mid-1990s by Yukihiro \"Matz\"
+        Matsumoto in Japan. Ruby is interpreted, high-level, and dynamically typed;
+        its interpreter uses garbage collection and just-in-time compilation. More
+        at Wikipedia"}], "corrections": [], "infoboxes": [{"infobox": "Ruby (programming
+        language)", "id": "https://en.wikipedia.org/wiki/Ruby_(programming_language)",
+        "content": "Ruby is a general-purpose programming language designed with an
+        emphasis on programming productivity and simplicity. In Ruby, everything is
+        an object, including primitive data types. Development of the language began
+        in the mid-1990s by Yukihiro \"Matz\" Matsumoto in Japan.", "img_src": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Ruby_logo.svg/330px-Ruby_logo.svg.png",
+        "urls": [{"title": "Wikipedia", "url": "https://en.wikipedia.org/wiki/Ruby_(programming_language)"}],
+        "engine": "wikipedia", "url": null, "template": "default.html", "parsed_url":
+        null, "title": "", "thumbnail": "", "priority": "", "engines": ["wikipedia"],
+        "positions": "", "score": 0, "category": "", "publishedDate": null, "attributes":
+        []}], "suggestions": [], "unresponsive_engines": []}'
+  recorded_at: Fri, 26 Jun 2026 18:48:16 GMT
+recorded_with: VCR 6.4.0

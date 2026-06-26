@@ -6,7 +6,13 @@ require "json"
 module Ask
   module Tools
     class WebSearch < Ask::Tool
-      SEARXNG_URL = ENV.fetch("SEARXNG_URL", "http://localhost:8888")
+      def self.searxng_url
+        @searxng_url || ENV.fetch("SEARXNG_URL", "http://localhost:8888")
+      end
+
+      def self.searxng_url=(url)
+        @searxng_url = url
+      end
 
       description "Search the web for current information. Use this to get up-to-date results, recent events, or facts that may have changed."
 
@@ -26,7 +32,7 @@ module Ask
       private
 
       def search(query)
-        uri = URI("#{SEARXNG_URL}/search?q=#{URI.encode_www_form_component(query)}&format=json")
+        uri = URI("#{self.class.searxng_url}/search?q=#{URI.encode_www_form_component(query)}&format=json")
         http = Net::HTTP.new(uri.host, uri.port)
         http.open_timeout = 5
         http.read_timeout = 10

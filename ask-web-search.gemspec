@@ -24,6 +24,8 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "ask-tools", ">= 0.1"
 
+  spec.add_development_dependency "vcr", "~> 6.0"
+  spec.add_development_dependency "webmock", "~> 3.26"
   spec.add_development_dependency "minitest", "~> 5.25"
   spec.add_development_dependency "rake", "~> 13.0"
 end

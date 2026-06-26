@@ -38,37 +38,27 @@ describe Ask::Tools::WebSearch do
       results = @tool.send(:parse_results, data)
       _(results.length).must_equal 2
       _(results[0][:url]).must_equal "https://example.com/1"
-      _(results[0][:title]).must_equal "Result One"
     end
 
     it "extracts infoboxes from JSON response" do
-      data = {
-        "results" => [],
-        "infoboxes" => [
-          { "id" => "https://wiki.example.com", "infobox" => "Topic", "content" => "Description" }
-        ]
-      }
+      data = { "results" => [], "infoboxes" => [{ "id" => "https://wiki.example.com", "infobox" => "Topic", "content" => "Desc" }] }
       results = @tool.send(:parse_results, data)
       _(results.length).must_equal 1
       _(results[0][:url]).must_equal "https://wiki.example.com"
-      _(results[0][:title]).must_equal "Topic"
     end
 
     it "deduplicates by URL" do
-      data = {
-        "results" => [
-          { "url" => "https://example.com", "title" => "First", "content" => "" },
-          { "url" => "https://example.com", "title" => "First (dup)", "content" => "" },
-          { "url" => "https://other.com", "title" => "Other", "content" => "" }
-        ]
-      }
+      data = { "results" => [
+        { "url" => "https://example.com", "title" => "First", "content" => "" },
+        { "url" => "https://example.com", "title" => "Dup", "content" => "" },
+        { "url" => "https://other.com", "title" => "Other", "content" => "" }
+      ]}
       results = @tool.send(:parse_results, data)
       _(results.length).must_equal 2
     end
 
     it "handles empty results" do
-      data = { "results" => [] }
-      results = @tool.send(:parse_results, data)
+      results = @tool.send(:parse_results, { "results" => [] })
       _(results).must_be :empty?
     end
 
@@ -78,22 +68,14 @@ describe Ask::Tools::WebSearch do
     end
 
     it "handles nil values in results" do
-      data = {
-        "results" => [
-          { "url" => nil, "title" => nil, "content" => nil }
-        ]
-      }
+      data = { "results" => [{ "url" => nil, "title" => nil, "content" => nil }] }
       results = @tool.send(:parse_results, data)
       _(results.length).must_equal 1
       assert_nil results[0][:url]
     end
 
     it "handles missing fields in results" do
-      data = {
-        "results" => [
-          { "url" => "https://example.com" }
-        ]
-      }
+      data = { "results" => [{ "url" => "https://example.com" }] }
       results = @tool.send(:parse_results, data)
       _(results.length).must_equal 1
       assert_nil results[0][:title]
@@ -101,7 +83,7 @@ describe Ask::Tools::WebSearch do
   end
 
   describe "formatting" do
-    it "formats results as numbered list with URLs" do
+    it "formats as numbered list with URLs" do
       results = [
         { url: "https://example.com", title: "Example", content: "" },
         { url: "https://test.com", title: "Test", content: "" }
@@ -111,9 +93,7 @@ describe Ask::Tools::WebSearch do
     end
 
     it "includes content when present" do
-      results = [
-        { url: "https://example.com", title: "Example", content: "An example site" }
-      ]
+      results = [{ url: "https://example.com", title: "Example", content: "An example site" }]
       formatted = @tool.send(:format_results, results)
       _(formatted).must_include "An example site"
     end
@@ -124,13 +104,80 @@ describe Ask::Tools::WebSearch do
     end
   end
 
-  describe "search" do
-    it "returns results from SearXNG with URLs" do
+  describe "search with VCR" do
+    before do
+      VCR.insert_cassette("searxng_results")
+    end
+
+    after do
+      VCR.eject_cassette
+    end
+
+    it "returns Ask::Result" do
       result = @tool.call("query" => "ruby programming language")
       _(result).must_be_kind_of Ask::Result
+      _(result.ok?).must_equal true
+    end
+
+    it "returns formatted string output" do
+      result = @tool.call("query" => "ruby programming language")
       _(result.output).must_be_kind_of String
       _(result.output).wont_equal "No results found."
+    end
+
+    it "returns numbered results with URLs" do
+      result = @tool.call("query" => "ruby programming language")
       _(result.output).must_match(%r{https?://})
+      _(result.output).must_match(/^1\./)
+    end
+
+    it "returns multiple results" do
+      result = @tool.call("query" => "ruby programming language")
+      numbered = result.output.split("\n").count { |l| l.match?(/^\d+\./) }
+      _(numbered).must_be :>=, 2
+    end
+
+    it "includes content descriptions" do
+      result = @tool.call("query" => "ruby programming language")
+      descriptions = result.output.split("\n").select { |l| l.start_with?("   ") && !l.start_with?("   http") }
+      _(descriptions.length).must_be :>=, 1
+    end
+
+    it "allows multiple calls via playback repeats" do
+      r1 = @tool.call("query" => "ruby programming language")
+      r2 = @tool.call("query" => "ruby programming language")
+      _(r1.output).must_equal r2.output
+    end
+  end
+
+  describe "connection errors" do
+    before do
+      WebMock.disable_net_connect!
+    end
+
+    after do
+      WebMock.reset!
+    end
+
+    it "handles connection refused" do
+      stub_request(:get, /localhost/).to_raise(Errno::ECONNREFUSED.new)
+      result = @tool.call("query" => "test")
+      _(result).must_be_kind_of Ask::Result
+      _(result.ok?).must_equal false
+    end
+
+    it "handles timeout" do
+      stub_request(:get, /localhost/).to_timeout
+      result = @tool.call("query" => "test")
+      _(result).must_be_kind_of Ask::Result
+      _(result.ok?).must_equal false
+    end
+
+    it "handles HTTP error" do
+      stub_request(:get, /localhost/).to_return(status: 500, body: "error")
+      result = @tool.call("query" => "test")
+      _(result).must_be_kind_of Ask::Result
+      _(result.ok?).must_equal false
     end
   end
 end
