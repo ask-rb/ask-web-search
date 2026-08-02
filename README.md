@@ -1,8 +1,12 @@
 # ask-web-search
 
-A web search tool for the ask-rb ecosystem. Provides `Ask::Tools::WebSearch`, which
-searches the web via a local [SearXNG](https://docs.searxng.org/) instance and returns
-formatted results for LLM consumption.
+[![Gem Version](https://badge.fury.io/rb/ask-web-search.svg)](https://badge.fury.io/rb/ask-web-search)
+
+A web search tool for the ask-rb ecosystem. It provides
+`Ask::Tools::WebSearch`, which searches the web via a local
+[SearXNG](https://docs.searxng.org/) instance and returns numbered markdown
+results for LLM consumption. It has no Rails dependencies; it depends only on
+ask-tools.
 
 ## Prerequisites
 
@@ -14,20 +18,10 @@ Start one with Docker:
 docker run -d --name searxng -p 8888:8080 searxng/searxng
 ```
 
-Or use the provided `docker-compose.yml`:
-
-```sh
-cd searxng
-docker compose up -d
-```
+Or use the provided `docker-compose.yml` in the `searxng` directory of this
+repository:
 
 ## Installation
-
-```sh
-gem install ask-web-search
-```
-
-Or in your Gemfile:
 
 ```ruby
 gem "ask-web-search"
@@ -43,7 +37,7 @@ export SEARXNG_URL=http://localhost:8888
 
 Defaults to `http://localhost:8888`.
 
-## Usage
+## Quick Start
 
 ```ruby
 require "ask/web_search"
@@ -51,35 +45,12 @@ require "ask/web_search"
 tool = Ask::Tools::WebSearch.new
 result = tool.execute(query: "ruby programming language")
 puts result
-# => 1. Ruby — A Programmer's Best Friend
-#     https://www.ruby-lang.org
-#     Ruby is a dynamic, open-source programming language...
 ```
-
-### With ask-rb Chat
-
-```ruby
-chat = Ask::Agent::Chat.new(
-  model: "deepseek-v4-flash",
-  tools: [Ask::Tools::WebSearch.new]
-)
-
-chat.ask("What's the latest on AI? Search the web.")
-```
-
-### With ask-rb Agent
-
-```ruby
-agent = Ask::Agent.new(tools: [Ask::Tools::WebSearch])
-agent.run("Find recent news about SpaceX")
-```
-
-## Output Format
 
 Results are returned as a numbered markdown-like string:
 
 ```
-1. Ruby — A Programmer's Best Friend
+1. Ruby - A Programmer's Best Friend
    https://www.ruby-lang.org
    Ruby is a dynamic, open-source programming language...
 
@@ -90,11 +61,16 @@ Results are returned as a numbered markdown-like string:
 
 If no results are found, returns `"No results found."`.
 
+## Full documentation
+
+The full ask-rb documentation lives at https://ask-rb.github.io/ask-docs.
+[Core: Web Search](https://ask-rb.github.io/ask-docs/core/web-search) covers
+ask-web-search in depth, including the ask-agent integration and the MCP
+server. API reference: https://ask-rb.github.io/ask-docs/reference/api.
+
 ## Development
 
-```sh
-git clone https://github.com/ask-rb/ask-web-search
-cd ask-web-search
+```
 bundle install
 bundle exec rake test
 ```
