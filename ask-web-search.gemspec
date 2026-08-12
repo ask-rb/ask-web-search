@@ -6,10 +6,12 @@ Gem::Specification.new do |spec|
   spec.authors = ["Kaka Ruto"]
   spec.email = ["kaka@myrrlabs.com"]
 
-  spec.summary = "Web search tool for the ask-rb ecosystem"
-  spec.description = "Provides Ask::Tools::WebSearch, a tool that searches the web " \
-                     "via SearXNG (local instance). Works with any ask-rb " \
-                     "chat or agent. Configure endpoint via SEARXNG_URL env var."
+  spec.summary = "Web search library for the ask-rb ecosystem"
+  spec.description = "Searches the web via a local SearXNG instance and returns " \
+                     "the results as clean numbered markdown. The capability " \
+                     "layer (WebSearch.search); the native Ask::Tools::WebSearch " \
+                     "agent tool is an optional integration that registers when " \
+                     "ask-tools is present. Configure endpoint via SEARXNG_URL env var."
   spec.homepage = "https://github.com/ask-rb/ask-web-search"
   spec.license = "MIT"
 
@@ -22,7 +24,10 @@ Gem::Specification.new do |spec|
   spec.files = Dir["lib/**/*", "LICENSE", "README.md"]
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "ask-tools", ">= 0.1"
+  # ask-tools is an OPTIONAL runtime integration (the native agent tool
+  # registers only when it is present); it is a dev dependency so the
+  # gem's own suite exercises the tool.
+  spec.add_development_dependency "ask-tools", ">= 0.1"
 
   spec.add_development_dependency "vcr", "~> 6.0"
   spec.add_development_dependency "webmock", "~> 3.26"

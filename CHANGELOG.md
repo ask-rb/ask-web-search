@@ -1,3 +1,18 @@
+## [0.3.0] - 2026-08-12
+
+### Changed
+
+- **A library, with the native tool as an optional integration.** The
+  capability lives at the module level: `Ask::WebSearch.search(query)`
+  returns the numbered markdown, `Ask::WebSearch.search_results(query)`
+  the raw list, and `WebSearch.searxng_url` / `searxng_url=` configure
+  the endpoint. `Ask::Tools::WebSearch` remains — a thin `Ask::Tool`
+  adapter over the module, registered in the `Ask::Tools` registry — but
+  it loads and registers only when ask-tools is present (LoadError-
+  guarded require), so the library works standalone and consumers that
+  only call `WebSearch.search` pay nothing. ask-tools is a development
+  dependency, never a runtime one.
+
 ## [0.2.1] - 2026-06-25
 
 ### Changed
