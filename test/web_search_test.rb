@@ -121,10 +121,12 @@ describe Ask::WebSearch do
   describe "connection errors" do
     before do
       WebMock.disable_net_connect!
+      Ask::WebSearch.max_retries = 0
     end
 
     after do
       WebMock.reset!
+      Ask::WebSearch.max_retries = Ask::WebSearch::DEFAULT_MAX_RETRIES
     end
 
     it "raises on connection refused" do
@@ -135,6 +137,80 @@ describe Ask::WebSearch do
     it "raises on HTTP error" do
       stub_request(:get, /localhost/).to_return(status: 500, body: "error")
       _(-> { Ask::WebSearch.search("test") }).must_raise RuntimeError
+    end
+  end
+
+  describe "retry behavior" do
+    before do
+      WebMock.disable_net_connect!
+    end
+
+    after do
+      WebMock.reset!
+      Ask::WebSearch.max_retries = Ask::WebSearch::DEFAULT_MAX_RETRIES
+    end
+
+    it "retries on connection refused and succeeds on second attempt" do
+      call_count = 0
+      stub_request(:get, /localhost/).to_return do
+        call_count += 1
+        if call_count == 1
+          raise Errno::ECONNREFUSED
+        else
+          { status: 200, body: '{"results": [{"url": "https://example.com", "title": "Example", "content": "Test"}]}' }
+        end
+      end
+
+      result = Ask::WebSearch.search("test")
+      _(result).must_include "Example"
+      _(call_count).must_equal 2
+    end
+
+    it "retries on HTTP 500 and succeeds on second attempt" do
+      call_count = 0
+      stub_request(:get, /localhost/).to_return do
+        call_count += 1
+        if call_count == 1
+          { status: 500, body: "error" }
+        else
+          { status: 200, body: '{"results": [{"url": "https://example.com", "title": "Example", "content": "Test"}]}' }
+        end
+      end
+
+      result = Ask::WebSearch.search("test")
+      _(result).must_include "Example"
+      _(call_count).must_equal 2
+    end
+
+    it "gives up after max_retries exhausted" do
+      Ask::WebSearch.max_retries = 2
+      stub_request(:get, /localhost/).to_raise(Errno::ECONNREFUSED.new)
+
+      _(-> { Ask::WebSearch.search("test") }).must_raise Errno::ECONNREFUSED
+    end
+
+    it "does not retry when max_retries is 0" do
+      Ask::WebSearch.max_retries = 0
+      call_count = 0
+      stub_request(:get, /localhost/).to_return do
+        call_count += 1
+        raise Errno::ECONNREFUSED
+      end
+
+      _(-> { Ask::WebSearch.search("test") }).must_raise Errno::ECONNREFUSED
+      _(call_count).must_equal 1
+    end
+
+    it "retries up to max_retries times" do
+      Ask::WebSearch.max_retries = 3
+      call_count = 0
+      stub_request(:get, /localhost/).to_return do
+        call_count += 1
+        raise Errno::ECONNREFUSED
+      end
+
+      _(-> { Ask::WebSearch.search("test") }).must_raise Errno::ECONNREFUSED
+      _(call_count).must_equal 4 # 1 initial + 3 retries
     end
   end
 end

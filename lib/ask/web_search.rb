@@ -22,6 +22,20 @@ module Ask
       @searxng_url = url
     end
 
+    # Retry configuration. Set max_retries to 0 to disable retries.
+    DEFAULT_MAX_RETRIES = 3
+    RETRY_BACKOFF = [0.5, 1.0, 2.0].freeze
+
+    def self.max_retries
+      return @max_retries if defined?(@max_retries)
+
+      @max_retries = DEFAULT_MAX_RETRIES
+    end
+
+    def self.max_retries=(val)
+      @max_retries = val
+    end
+
     # Searches +query+ and returns the results as numbered markdown
     # ("No results found." when SearXNG found nothing). Raises on
     # connection/HTTP failures — the caller decides how to surface them.
@@ -30,18 +44,30 @@ module Ask
     end
 
     # The raw result list: { url:, title:, content: } entries from the
-    # results and infoboxes, deduplicated by url.
+    # results and infoboxes, deduplicated by url. Retries up to
+    # max_retries times on connection/HTTP failures with exponential
+    # backoff. Set max_retries to 0 to disable.
     def self.search_results(query)
       uri = URI("#{searxng_url}/search?q=#{URI.encode_www_form_component(query)}&format=json")
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.open_timeout = 5
-      http.read_timeout = 10
-      req = Net::HTTP::Get.new(uri)
-      req["User-Agent"] = "ask-web-search/#{Ask::WebSearch::VERSION}"
-      res = http.request(req)
-      raise "SearXNG returned #{res.code}: #{res.body}" unless res.code.start_with?("2")
+      retries = max_retries || 0
+      attempt = 0
+      begin
+        attempt += 1
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.open_timeout = 5
+        http.read_timeout = 10
+        req = Net::HTTP::Get.new(uri)
+        req["User-Agent"] = "ask-web-search/#{Ask::WebSearch::VERSION}"
+        res = http.request(req)
+        raise "SearXNG returned #{res.code}: #{res.body}" unless res.code.start_with?("2")
 
-      parse_results(JSON.parse(res.body))
+        parse_results(JSON.parse(res.body))
+      rescue StandardError
+        raise if attempt > retries
+
+        sleep RETRY_BACKOFF[[attempt - 1, RETRY_BACKOFF.size - 1].min]
+        retry
+      end
     end
 
     def self.parse_results(data)
