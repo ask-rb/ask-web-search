@@ -1,3 +1,23 @@
+## [0.5.0] — 2026-09-09
+
+### Added
+
+- **Engine failure diagnostics.** `AllEnginesFailedError` carries
+  per-engine reasons (CAPTCHA, timeout, suspended) so the agent knows
+  *why* a search returned nothing. `search()` raises it when SearXNG
+  answered but every engine failed; "No results found." is now reserved
+  for clean empty responses.
+- **`search_raw()`** — exposes the full SearXNG response with
+  `unresponsive_engines` for callers that need engine diagnostics.
+
+## [0.4.0] — 2026-09-09
+
+### Added
+
+- **Retry with exponential backoff.** `search()` retries up to 3 times
+  on connection/HTTP failures (0.5s, 1s, 2s backoff). Configurable via
+  `WebSearch.max_retries`; set to 0 to disable.
+
 ## [0.3.0] - 2026-08-12
 
 ### Changed
