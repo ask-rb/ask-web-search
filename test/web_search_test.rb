@@ -41,6 +41,23 @@ describe Ask::WebSearch do
       _(results).must_be :empty?
     end
 
+    it "extracts unresponsive engines from JSON response" do
+      data = {
+        "results" => [],
+        "unresponsive_engines" => [["duckduckgo", "CAPTCHA"], ["mojeek", "timeout"]]
+      }
+      response = Ask::WebSearch.send(:parse_response, data)
+      _(response[:results]).must_be :empty?
+      _(response[:unresponsive]).must_equal [["duckduckgo", "CAPTCHA"], ["mojeek", "timeout"]]
+    end
+
+    it "defaults unresponsive to empty when SearXNG omits it" do
+      data = { "results" => [{ "url" => "https://example.com", "title" => "T", "content" => "C" }] }
+      response = Ask::WebSearch.send(:parse_response, data)
+      _(response[:results].length).must_equal 1
+      _(response[:unresponsive]).must_be :empty?
+    end
+
     it "handles nil values in results" do
       data = { "results" => [{ "url" => nil, "title" => nil, "content" => nil }] }
       results = Ask::WebSearch.send(:parse_results, data)
@@ -137,6 +154,61 @@ describe Ask::WebSearch do
     it "raises on HTTP error" do
       stub_request(:get, /localhost/).to_return(status: 500, body: "error")
       _(-> { Ask::WebSearch.search("test") }).must_raise RuntimeError
+    end
+  end
+
+  describe "engine failure diagnostics" do
+    before do
+      WebMock.disable_net_connect!
+      Ask::WebSearch.max_retries = 0
+    end
+
+    after do
+      WebMock.reset!
+      Ask::WebSearch.max_retries = Ask::WebSearch::DEFAULT_MAX_RETRIES
+    end
+
+    it "raises AllEnginesFailedError with per-engine reasons when all engines fail" do
+      stub_request(:get, /localhost/).to_return(
+        status: 200,
+        body: '{"results": [], "unresponsive_engines": [["duckduckgo", "CAPTCHA"], ["mojeek", "timeout"]]}'
+      )
+
+      err = _(-> { Ask::WebSearch.search("test query") }).must_raise Ask::WebSearch::AllEnginesFailedError
+      _(err.message).must_include "duckduckgo"
+      _(err.message).must_include "CAPTCHA"
+      _(err.message).must_include "mojeek"
+      _(err.message).must_include "timeout"
+      _(err.message).must_include "test query"
+    end
+
+    it "returns No results found when SearXNG answered cleanly with zero results" do
+      stub_request(:get, /localhost/).to_return(
+        status: 200,
+        body: '{"results": [], "unresponsive_engines": []}'
+      )
+
+      _(Ask::WebSearch.search("obscure query")).must_equal "No results found."
+    end
+
+    it "returns results when some engines failed but others succeeded" do
+      stub_request(:get, /localhost/).to_return(
+        status: 200,
+        body: '{"results": [{"url": "https://example.com", "title": "Example", "content": "Test"}], "unresponsive_engines": [["duckduckgo", "CAPTCHA"]]}'
+      )
+
+      _(Ask::WebSearch.search("test")).must_include "Example"
+    end
+
+    it "search_raw exposes both results and unresponsive engines" do
+      stub_request(:get, /localhost/).to_return(
+        status: 200,
+        body: '{"results": [{"url": "https://example.com", "title": "Example", "content": "Test"}], "unresponsive_engines": [["duckduckgo", "CAPTCHA"]]}'
+      )
+
+      response = Ask::WebSearch.search_raw("test")
+      _(response[:results].length).must_equal 1
+      _(response[:unresponsive]).must_equal [["duckduckgo", "CAPTCHA"]]
     end
   end
 
