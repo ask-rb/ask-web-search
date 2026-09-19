@@ -36,6 +36,12 @@ module Ask
     DEFAULT_MAX_RETRIES = 3
     RETRY_BACKOFF = [0.5, 1.0, 2.0].freeze
 
+    # SearXNG's freshness windows — the valid values of its time_range
+    # search parameter. Anything else is rejected up front, so a bad value
+    # fails with a message listing these instead of silently searching
+    # unfiltered.
+    TIME_RANGES = %w[day week month year].freeze
+
     def self.max_retries
       return @max_retries if defined?(@max_retries)
 
@@ -52,27 +58,49 @@ module Ask
     # AllEnginesFailedError with per-engine diagnostics (see
     # #format_engine_error). Raises on connection/HTTP failures — the
     # caller decides how to surface them.
-    def self.search(query)
-      response = search_raw(query)
-      raise AllEnginesFailedError, format_engine_error(query, response) if response[:results].empty? &&
+    #
+    # time_range: restricts results to a freshness window — one of
+    # TIME_RANGES (day, week, month, year). With a window set, a clean
+    # zero-result search says so ("No results found within the day
+    # freshness window...") instead of a bare "No results found.", so the
+    # agent widens the window rather than concluding the web is silent.
+    # categories: scopes the search to a SearXNG vertical — e.g. "news"
+    # or "science" (research papers); instances configure their own set,
+    # so values pass through unvalidated. A string or anything Array-able
+    # ("news,science" form).
+    def self.search(query, time_range: nil, categories: nil)
+      time_range = normalize_time_range(time_range)
+      categories = normalize_categories(categories)
+      response = search_raw(query, time_range: time_range, categories: categories)
+      raise AllEnginesFailedError, format_engine_error(query, response, time_range: time_range) if response[:results].empty? &&
                                                                           response[:unresponsive].any?
 
-      format_results(response[:results])
+      return format_results(response[:results]) unless response[:results].empty? && time_range
+
+      "No results found within the #{time_range} freshness window. Retry with a broader time_range or without one."
     end
 
     # The raw result list: { url:, title:, content: } entries from the
     # results and infoboxes, deduplicated by url. Retries up to
     # max_retries times on connection/HTTP failures with exponential
-    # backoff. Set max_retries to 0 to disable.
-    def self.search_results(query)
-      search_raw(query)[:results]
+    # backoff. Set max_retries to 0 to disable. See #search for
+    # time_range / categories.
+    def self.search_results(query, time_range: nil, categories: nil)
+      search_raw(query, time_range: time_range, categories: categories)[:results]
     end
 
     # The full SearXNG response: { results: [...], unresponsive: [[name,
     # reason], ...] }. Same retry logic as #search_results, but preserves
     # the engine diagnostics the caller needs to explain an empty result.
-    def self.search_raw(query)
-      uri = URI("#{searxng_url}/search?q=#{URI.encode_www_form_component(query)}&format=json")
+    # time_range / categories are normalized here — the single point that
+    # builds the request — and are idempotent, so callers may pass raw or
+    # already-normalized values.
+    def self.search_raw(query, time_range: nil, categories: nil)
+      params = { q: query, format: "json" }
+      params[:time_range] = normalize_time_range(time_range) if time_range
+      params[:categories] = normalize_categories(categories) if categories
+      uri = URI("#{searxng_url}/search")
+      uri.query = URI.encode_www_form(params)
       retries = max_retries || 0
       attempt = 0
       begin
@@ -97,16 +125,40 @@ module Ask
     # Formats the engine failure into an actionable message: which engines
     # failed and why, plus what the agent can try next. Keeps the raw
     # SearXNG reason strings (CAPTCHA, timeout, suspended) — the caller
-    # can see exactly what happened.
-    def self.format_engine_error(query, response)
+    # can see exactly what happened. When a freshness window was set, the
+    # hint suggests broadening it.
+    def self.format_engine_error(query, response, time_range: nil)
       lines = ["No search results for #{query.inspect} — all #{response[:unresponsive].size} engine(s) failed:"]
       response[:unresponsive].each do |name, reason|
         lines << "- #{name}: #{reason}"
       end
-      lines << "Try: a simpler query, or ask-web-fetch for a known URL."
+      hint = "Try: a simpler query, or ask-web-fetch for a known URL."
+      hint = "Try: a simpler query, a broader time_range, or ask-web-fetch for a known URL." if time_range
+      lines << hint
       lines.join("\n")
     end
     private_class_method :format_engine_error
+
+    # Validates +time_range+ against TIME_RANGES (nil/blank → nil, symbols
+    # accepted). Raises ArgumentError for anything else — the request is
+    # never sent.
+    def self.normalize_time_range(time_range)
+      value = time_range.to_s.strip.downcase
+      return nil if value.empty?
+
+      raise ArgumentError, "invalid time_range #{time_range.inspect} — use one of: #{TIME_RANGES.join(', ')}" unless TIME_RANGES.include?(value)
+
+      value
+    end
+
+    # Normalizes +categories+ to SearXNG's comma-separated form —
+    # ["news", :science] → "news,science"; nil/blank → nil. Values pass
+    # through unvalidated: SearXNG instances configure their own category
+    # set, and a bad one degrades to a clean empty result, not a failure.
+    def self.normalize_categories(categories)
+      value = Array(categories).map { |c| c.to_s.strip.downcase }.reject(&:empty?).uniq.join(",")
+      value.empty? ? nil : value
+    end
 
     # Parses the full SearXNG JSON response into { results:, unresponsive: }.
     # results are { url:, title:, content: } entries from results and

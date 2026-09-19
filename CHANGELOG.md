@@ -1,3 +1,31 @@
+## [0.6.0] — 2026-09-19
+
+### Added
+
+- **Freshness windows.** `search(query, time_range:)` restricts results
+  to a SearXNG freshness window — `day`, `week`, `month`, `year`
+  (validated up front; anything else raises `ArgumentError` listing the
+  valid values). A clean zero-result search WITH a window says so —
+  "No results found within the day freshness window. Retry with a
+  broader time_range or without one." — so the agent widens the window
+  instead of concluding the web is silent, and engine-failure
+  diagnostics suggest a broader window when one was set. Known upstream
+  limitation: as of SearXNG 2026.6.x every date-capable engine returns
+  zero results under a date filter, so windows currently fail soft with
+  that message; no gem change needed when the engines are fixed.
+- **Verticals.** `search(query, categories:)` scopes the search to a
+  SearXNG category — `news`, `science` (research papers), or any category
+  the instance configures. Accepts a string or anything Array-able
+  (`[:news, :science]` → `news,science`); values pass through
+  unvalidated because instances configure their own set. Requires the
+  instance to have vertical engines enabled (bing news / google news /
+  arxiv / pubmed in the searxng/ compose config).
+- Both parameters flow through `search_raw` / `search_results` and both
+  tool framings: the native `Ask::Tools::WebSearch` (`time_range` and
+  `categories` enum properties; a bad value fails the `Ask::Result`) and
+  the MCP server's `ask_web_search` tool (released separately in
+  ask-web-search-mcp 0.5.0).
+
 ## [0.5.0] — 2026-09-09
 
 ### Added

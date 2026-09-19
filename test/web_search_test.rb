@@ -212,6 +212,85 @@ describe Ask::WebSearch do
     end
   end
 
+  describe "search parameters" do
+    before do
+      WebMock.disable_net_connect!
+      Ask::WebSearch.max_retries = 0
+    end
+
+    after do
+      WebMock.reset!
+      Ask::WebSearch.max_retries = Ask::WebSearch::DEFAULT_MAX_RETRIES
+    end
+
+    it "sends only the base params when no options are given" do
+      stub = stub_request(:get, /localhost/).with(query: { "q" => "test", "format" => "json" })
+        .to_return(status: 200, body: '{"results": [], "unresponsive_engines": []}')
+      Ask::WebSearch.search("test")
+      assert_requested(stub)
+    end
+
+    it "forwards time_range to SearXNG (symbols accepted)" do
+      stub = stub_request(:get, /localhost/).with(query: hash_including("q" => "test", "time_range" => "week"))
+        .to_return(status: 200, body: '{"results": [], "unresponsive_engines": []}')
+      Ask::WebSearch.search("test", time_range: :week)
+      assert_requested(stub)
+    end
+
+    it "forwards categories to SearXNG" do
+      stub = stub_request(:get, /localhost/).with(query: hash_including("categories" => "news"))
+        .to_return(status: 200, body: '{"results": [], "unresponsive_engines": []}')
+      Ask::WebSearch.search("test", categories: "news")
+      assert_requested(stub)
+    end
+
+    it "joins array categories into SearXNG's comma form" do
+      stub = stub_request(:get, /localhost/).with(query: hash_including("categories" => "news,science"))
+        .to_return(status: 200, body: '{"results": [], "unresponsive_engines": []}')
+      Ask::WebSearch.search("test", categories: [:news, "Science"])
+      assert_requested(stub)
+    end
+
+    it "forwards both parameters through search_results" do
+      stub = stub_request(:get, /localhost/).with(query: hash_including("time_range" => "month", "categories" => "science"))
+        .to_return(status: 200, body: '{"results": [], "unresponsive_engines": []}')
+      _(Ask::WebSearch.search_results("test", time_range: "month", categories: "science")).must_be :empty?
+      assert_requested(stub)
+    end
+
+    it "rejects an invalid time_range before hitting SearXNG" do
+      err = _(-> { Ask::WebSearch.search("test", time_range: "fortnight") }).must_raise ArgumentError
+      _(err.message).must_include "day, week, month, year"
+    end
+
+    it "treats a blank time_range as no window" do
+      stub = stub_request(:get, /localhost/).with(query: { "q" => "test", "format" => "json" })
+        .to_return(status: 200, body: '{"results": [], "unresponsive_engines": []}')
+      Ask::WebSearch.search("test", time_range: "")
+      assert_requested(stub)
+    end
+
+    it "tells the agent the window may be the cause of a clean empty result" do
+      stub_request(:get, /localhost/).to_return(status: 200, body: '{"results": [], "unresponsive_engines": []}')
+      _(Ask::WebSearch.search("test", time_range: "day"))
+        .must_equal "No results found within the day freshness window. Retry with a broader time_range or without one."
+    end
+
+    it "still returns plain No results found without a window" do
+      stub_request(:get, /localhost/).to_return(status: 200, body: '{"results": [], "unresponsive_engines": []}')
+      _(Ask::WebSearch.search("test")).must_equal "No results found."
+    end
+
+    it "suggests a broader time_range in engine-failure diagnostics" do
+      stub_request(:get, /localhost/).to_return(
+        status: 200,
+        body: '{"results": [], "unresponsive_engines": [["duckduckgo", "timeout"]]}'
+      )
+      err = _(-> { Ask::WebSearch.search("test", time_range: "day") }).must_raise Ask::WebSearch::AllEnginesFailedError
+      _(err.message).must_include "broader time_range"
+    end
+  end
+
   describe "retry behavior" do
     before do
       WebMock.disable_net_connect!
@@ -317,6 +396,46 @@ if defined?(Ask::Tools)
       _(Ask::WebSearch.searxng_url).must_equal "http://searxng.test"
     ensure
       Ask::WebSearch.searxng_url = nil
+    end
+
+    describe "optional search parameters" do
+      before do
+        WebMock.disable_net_connect!
+      end
+
+      after do
+        WebMock.reset!
+      end
+
+      it "exposes time_range and categories in the schema" do
+        schema = @tool.params_schema
+        _(schema.dig("properties", "time_range", "enum")).must_equal %w[day week month year]
+        _(schema.dig("properties", "categories", "enum")).must_equal %w[general news science]
+        _(schema["required"]).must_equal ["query"]
+      end
+
+      it "forwards both parameters to the library" do
+        stub = stub_request(:get, /localhost/).with(query: hash_including("time_range" => "week", "categories" => "news"))
+          .to_return(status: 200, body: '{"results": [{"url": "https://example.com", "title": "Example", "content": "Test"}], "unresponsive_engines": []}')
+        result = @tool.call("query" => "test", "time_range" => "week", "categories" => "news")
+        _(result.ok?).must_equal true
+        _(result.output).must_include "Example"
+        assert_requested(stub)
+      end
+
+      it "omits them from the request when not given" do
+        stub = stub_request(:get, /localhost/).with(query: { "q" => "test", "format" => "json" })
+          .to_return(status: 200, body: '{"results": [], "unresponsive_engines": []}')
+        result = @tool.call("query" => "test")
+        _(result.ok?).must_equal true
+        assert_requested(stub)
+      end
+
+      it "fails the result with a helpful message on an invalid time_range" do
+        result = @tool.call("query" => "test", "time_range" => "fortnight")
+        _(result.ok?).must_equal false
+        _(result.error).must_include "day, week, month, year"
+      end
     end
 
     describe "search with VCR" do

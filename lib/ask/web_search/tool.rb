@@ -24,13 +24,23 @@ module Ask
       params(
         type: "object",
         properties: {
-          query: { type: "string", description: "The search query" }
+          query: { type: "string", description: "The search query" },
+          time_range: {
+            type: "string",
+            enum: Ask::WebSearch::TIME_RANGES,
+            description: "Freshness window: only results from the past day, week, month, or year. Use for recency-sensitive queries (news, prices, releases); omit otherwise."
+          },
+          categories: {
+            type: "string",
+            enum: %w[general news science],
+            description: "Vertical to search: general web results (default), news, or science (research papers). Use news for current events, science for papers."
+          }
         },
         required: ["query"]
       )
 
-      def execute(query:)
-        Ask::Result.ok(data: Ask::WebSearch.search(query))
+      def execute(query:, time_range: nil, categories: nil)
+        Ask::Result.ok(data: Ask::WebSearch.search(query, time_range: time_range, categories: categories))
       end
     end
   end
