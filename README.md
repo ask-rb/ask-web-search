@@ -93,6 +93,39 @@ Ask::WebSearch.search("retrieval augmented generation", categories: "science")
   without them SearXNG silently resolves the request against the general
   engines.
 
+## SafeSearch and adult content
+
+The gem returns results exactly as SearXNG produces them — it does no
+content filtering of its own. Whether adult sites appear in ordinary
+searches is decided entirely by the SearXNG instance's SafeSearch
+setting, which SearXNG defaults to **off**. To keep porn out of results,
+configure the instance:
+
+```yaml
+# /etc/searxng/settings.yml
+preferences:
+  lock:
+    - safesearch
+
+search:
+  safe_search: 2
+```
+
+- `safe_search: 2` is strict filtering.
+- Locking the `safesearch` preference forces that level onto every
+  request, so neither this gem, the JSON API, nor the web UI can relax
+  it back to 0.
+- Filtering is enforced **per engine**: SearXNG forwards the level
+  upstream and engines that don't implement SafeSearch (e.g.
+  `duckduckgo_web`, which carries an upstream `TODO: support safesearch`)
+  pass adult results through regardless of the setting. Prefer engines
+  that support it (`bing`, `duckduckgo`, `google`). The `searxng/` compose
+  config in this repository uses `duckduckgo` for this reason.
+
+SafeSearch is best-effort upstream filtering — strict is reliable in
+practice but not a guarantee. Consumers needing a hard guarantee should
+post-filter results by domain.
+
 ## Full documentation
 
 The full ask-rb documentation lives at https://ask-rb.github.io/ask-docs.
