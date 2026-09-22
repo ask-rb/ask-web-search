@@ -7,13 +7,15 @@ require_relative "web_search/version"
 
 module Ask
   # Searches the web and returns the results as clean, numbered markdown
-  # for LLM consumption. Two interchangeable backends: TinyFish's hosted
-  # search API — primary when TINYFISH_API_KEY is set, so newcomers need
-  # no self-hosted infrastructure — and a local SearXNG instance for
-  # self-hosters, which is also the automatic fallback when TinyFish
-  # fails. The capability layer: one entry point (WebSearch.search).
-  # Tool framing — name, parameter schema, result wrapping — lives with
-  # the consumers (the MCP server, the agents) that call this library.
+  # for LLM consumption. Two interchangeable backends: a local SearXNG
+  # instance — the default path for everyone — and TinyFish's hosted
+  # search API, strictly opt-in (SEARCH_BACKEND=tinyfish + a free API
+  # key) for users who'd rather hold a key than run SearXNG. When the
+  # tinyfish backend fails, an explicitly configured SearXNG endpoint is
+  # still the automatic fallback. The capability layer: one entry point
+  # (WebSearch.search). Tool framing — name, parameter schema, result
+  # wrapping — lives with the consumers (the MCP server, the agents)
+  # that call this library.
   module WebSearch
     # Search errors that carry engine diagnostics — the agent needs to
     # know *which* engines failed and *why* (CAPTCHA, timeout, suspended)
@@ -46,11 +48,14 @@ module Ask
     # unfiltered.
     TIME_RANGES = %w[day week month year].freeze
 
-    # TinyFish's hosted search endpoint — the primary backend for anyone
-    # holding a (free) TINYFISH_API_KEY, so no SearXNG instance is needed.
-    # The bare host root per the official docs curl example; the
-    # /client.search.query path seen on the marketing pages 404s.
+    # TinyFish's hosted search endpoint — available when the tinyfish
+    # backend is selected (SEARCH_BACKEND=tinyfish). The bare host root
+    # per the official docs curl example; the /client.search.query path
+    # seen on the marketing pages 404s.
     TINYFISH_SEARCH_URL = "https://api.search.tinyfish.ai"
+
+    # The selectable backends (see .backend for how one is chosen).
+    BACKENDS = %w[searxng tinyfish].freeze
 
     # Our time_range → TinyFish's recency_minutes (SearXNG's month/year
     # are approximate engine filters anyway; these are the equivalents).
@@ -72,6 +77,41 @@ module Ask
       "research_paper" => "research_paper"
     }.freeze
 
+    # The search backend — :searxng (the default path for everyone) or
+    # :tinyfish (opt-in for users who'd rather hold an API key than run
+    # SearXNG). Selection precedence:
+    #
+    #   1. TINYFISH_SEARCH=0 — a hard-off that forces :searxng
+    #   2. backend= setter (Ask::WebSearch.backend = :tinyfish)
+    #   3. SEARCH_BACKEND env ("searxng" | "tinyfish")
+    #   4. default :searxng
+    def self.backend
+      return :searxng if ENV["TINYFISH_SEARCH"] == "0"
+      return @backend if defined?(@backend) && @backend
+
+      raw = ENV["SEARCH_BACKEND"]
+      return :searxng if raw.to_s.empty?
+
+      normalize_backend(raw)
+    end
+
+    # Selects the backend in code (:searxng / :tinyfish, or nil to fall
+    # back to env/default). Raises ArgumentError for anything else —
+    # config-time failure instead of a silently ignored value.
+    def self.backend=(name)
+      @backend = name.nil? ? nil : normalize_backend(name)
+    end
+
+    def self.normalize_backend(name)
+      value = name.to_s.strip.downcase
+      unless BACKENDS.include?(value)
+        raise ArgumentError, "invalid backend #{name.inspect} — use one of: #{BACKENDS.join(', ')}"
+      end
+
+      value.to_sym
+    end
+    private_class_method :normalize_backend
+
     # The TinyFish API key: ask-auth's chain when that gem is present
     # (env override → ~/.ask/credentials.yml → …), raw ENV otherwise.
     # nil when nothing resolves.
@@ -83,14 +123,12 @@ module Ask
       nil
     end
 
-    # True when TinyFish should be the primary backend: a key resolves
-    # (#tinyfish_api_key) and TINYFISH_SEARCH=0 has not disabled it.
-    # Read fresh on every call so tests and config reloads don't need
-    # memo resets.
+    # True when searches should go to TinyFish — i.e. the backend was
+    # explicitly selected. Read fresh on every call so tests and config
+    # reloads don't need memo resets. Holding a key alone does NOT
+    # opt in: SearXNG stays the default path.
     def self.use_tinyfish?
-      return false if ENV["TINYFISH_SEARCH"] == "0"
-
-      !tinyfish_api_key.to_s.empty?
+      backend == :tinyfish
     end
 
     # True when a SearXNG endpoint was configured explicitly (SEARXNG_URL
@@ -151,14 +189,15 @@ module Ask
     end
 
     # The full response: { results: [...], unresponsive: [[name,
-    # reason], ...] }. Routes to TinyFish when #use_tinyfish?, falling
-    # back to SearXNG (only when explicitly configured) if TinyFish
-    # raises; otherwise straight to SearXNG — byte-for-byte the 0.6.x
-    # behavior for keyless users. Same retry logic either way, but
-    # preserves the engine diagnostics the caller needs to explain an
-    # empty result. time_range / categories are normalized by the
-    # backends that build requests — idempotent, so callers may pass
-    # raw or already-normalized values.
+    # reason], ...] }. Routes to TinyFish when #use_tinyfish? (the
+    # opt-in tinyfish backend — a keyless selection raises its
+    # onboarding error; a transport failure falls back to SearXNG when
+    # explicitly configured), otherwise to SearXNG — the default path
+    # for everyone. Same retry logic either way, but preserves the
+    # engine diagnostics the caller needs to explain an empty result.
+    # time_range / categories are normalized by the backends that build
+    # requests — idempotent, so callers may pass raw or
+    # already-normalized values.
     def self.search_raw(query, time_range: nil, categories: nil)
       return searxng_search_raw(query, time_range: time_range, categories: categories) unless use_tinyfish?
 
@@ -207,6 +246,14 @@ module Ask
     # catches). time_range maps to recency_minutes; the FIRST
     # recognized categories value maps to domain_type.
     def self.tinyfish_search_raw(query, time_range: nil, categories: nil)
+      key = tinyfish_api_key
+      if key.to_s.empty?
+        raise Error, "TinyFish backend selected (SEARCH_BACKEND=tinyfish) but no API key resolves. " \
+                     "Get a free key at https://agent.tinyfish.ai/api-keys, then add " \
+                     "`tinyfish_api_key: <key>` to ~/.ask/credentials.yml or export " \
+                     "TINYFISH_API_KEY — or drop SEARCH_BACKEND to stay on the default SearXNG path."
+      end
+
       params = { query: query }
       normalized_range = normalize_time_range(time_range)
       params[:recency_minutes] = TIME_RANGE_TO_MINUTES[normalized_range] if normalized_range
@@ -224,7 +271,7 @@ module Ask
         http.open_timeout = 5
         http.read_timeout = 10
         req = Net::HTTP::Get.new(uri)
-        req["X-API-Key"] = tinyfish_api_key
+        req["X-API-Key"] = key
         req["User-Agent"] = "ask-web-search/#{Ask::WebSearch::VERSION}"
         res = http.request(req)
         raise Error, "TinyFish returned #{res.code}: #{res.body[0, 200]}" unless res.code.start_with?("2")

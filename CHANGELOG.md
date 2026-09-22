@@ -1,7 +1,26 @@
 ## [Unreleased]
 
+### Changed
+
+- **SearXNG is the default backend again.** Merely holding a TinyFish
+  key no longer switches routing — as of 0.7.0 a resolving
+  `TINYFISH_API_KEY` made TinyFish primary for everyone; now every
+  setup keeps the self-hosted default unless TinyFish is explicitly
+  selected (see Added). Existing `TINYFISH_SEARCH=0` users are
+  unaffected (still a hard-off).
+
 ### Added
 
+- **Explicit backend selection.** `Ask::WebSearch.backend` /
+  `backend=` (code, beats env; nil falls back) or
+  `SEARCH_BACKEND=searxng|tinyfish` (env), default `:searxng`.
+  Invalid names raise `ArgumentError` listing the valid ones; config
+  failures fail at selection time, not mid-search.
+- **Onboarding error for a keyless TinyFish selection.** Choosing the
+  tinyfish backend without a resolving key raises an error with the
+  free-key URL and both storage options (ask-auth credentials file or
+  `TINYFISH_API_KEY`) instead of a bare transport failure — and never
+  sends a request.
 - **ask-auth credential resolution for the TinyFish key.** When the
   ask-auth gem is present (optional integration, LoadError-guarded like
   ask-tools), the key resolves through `Ask::Auth` — env override first,

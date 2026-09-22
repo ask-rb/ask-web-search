@@ -9,21 +9,9 @@ depends only on ask-tools.
 
 ## Backends
 
-Two interchangeable backends, chosen automatically at call time:
+Two interchangeable backends:
 
-1. **TinyFish (recommended — no self-hosting).** Get a free API key at
-   [agent.tinyfish.ai](https://agent.tinyfish.ai/api-keys) and export it:
-
-   ```sh
-   export TINYFISH_API_KEY=...
-   ```
-
-   That's the whole setup — no Docker, no SearXNG instance. Live
-   browser-rendered results, freshness windows, and the news /
-   research-paper verticals all work out of the box.
-
-2. **SearXNG (self-hosted).** For users who want queries to stay local,
-   and as the automatic fallback when TinyFish fails: a running
+1. **SearXNG (the default — for everyone).** Queries go to a local
    [SearXNG](https://docs.searxng.org/) instance, default
    `http://localhost:8888`. Start one with Docker:
 
@@ -34,14 +22,32 @@ Two interchangeable backends, chosen automatically at call time:
    Or use the provided `docker-compose.yml` in the `searxng` directory of
    this repository.
 
-Routing rules:
+2. **TinyFish (opt-in — for people who'd rather hold an API key than set
+   up SearXNG).** Two steps: select the backend, and provide a key.
 
-- `TINYFISH_API_KEY` set → TinyFish primary; if TinyFish fails **and** a
-  SearXNG endpoint is explicitly configured, the call falls back to
-  SearXNG automatically (combined errors surface both failures).
-- No key → SearXNG only, exactly as in 0.6.x.
-- `TINYFISH_SEARCH=0` disables TinyFish outright (SearXNG only, even
-  with a key).
+   ```sh
+   export SEARCH_BACKEND=tinyfish
+   ```
+
+   Get a free key (no credit card) at
+   [agent.tinyfish.ai](https://agent.tinyfish.ai/api-keys) and store it —
+   either in `~/.ask/credentials.yml` via ask-auth (one line:
+   `tinyfish_api_key: <key>`, file is 0600) or `export
+   TINYFISH_API_KEY=...`. Selecting tinyfish without a key raises an
+   onboarding error that says exactly that; holding a key without
+   selecting does nothing — SearXNG stays the default.
+
+Selection precedence (first match wins):
+
+1. `TINYFISH_SEARCH=0` — a hard-off that forces SearXNG
+2. `Ask::WebSearch.backend = :tinyfish | :searxng` (in code)
+3. `SEARCH_BACKEND=tinyfish | searxng` (env)
+4. default → SearXNG
+
+When the tinyfish backend fails (network, rate limit) and a SearXNG
+endpoint is explicitly configured, the call falls back to SearXNG
+automatically — combined errors surface both failures. Invalid backend
+names raise `ArgumentError` listing the valid ones.
 
 ## Installation
 
@@ -52,7 +58,8 @@ gem "ask-web-search"
 ## Configuration
 
 ```sh
-export TINYFISH_API_KEY=...   # TinyFish (recommended): free key, instant search
+export SEARCH_BACKEND=tinyfish   # opt in to TinyFish (default: searxng)
+export TINYFISH_API_KEY=...      # TinyFish key (or tinyfish_api_key: in ~/.ask/credentials.yml)
 export SEARXNG_URL=http://localhost:8888   # SearXNG endpoint (default shown)
 ```
 

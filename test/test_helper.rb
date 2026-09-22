@@ -7,9 +7,10 @@ require "vcr"
 require "webmock/minitest"
 
 # Backend-routing env must be deterministic: a developer's exported
-# TINYFISH_API_KEY / SEARXNG_URL would silently reroute the suite.
-# Individual describes re-set what they need in before/after blocks.
-%w[TINYFISH_API_KEY TINYFISH_SEARCH SEARXNG_URL].each { |k| ENV.delete(k) }
+# SEARCH_BACKEND / TINYFISH_API_KEY / SEARXNG_URL would silently reroute
+# the suite. Individual describes re-set what they need in before/after
+# blocks.
+%w[TINYFISH_API_KEY TINYFISH_SEARCH SEARCH_BACKEND SEARXNG_URL].each { |k| ENV.delete(k) }
 
 # Neuter ask-auth's File provider: the machine's real
 # ~/.ask/credentials.yml must not leak keys into (or reroute) the suite.

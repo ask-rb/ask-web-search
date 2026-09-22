@@ -298,12 +298,15 @@ describe Ask::WebSearch do
       WebMock.disable_net_connect!
       Ask::WebSearch.max_retries = 0
       Ask::WebSearch.searxng_url = nil
-      @saved = %w[TINYFISH_API_KEY TINYFISH_SEARCH SEARXNG_URL].to_h { |k| [k, ENV.delete(k)] }
+      Ask::WebSearch.backend = nil
+      @saved = %w[TINYFISH_API_KEY TINYFISH_SEARCH SEARCH_BACKEND SEARXNG_URL].to_h { |k| [k, ENV.delete(k)] }
+      ENV["SEARCH_BACKEND"] = "tinyfish"
     end
 
     after do
       @saved.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
       Ask::WebSearch.searxng_url = nil
+      Ask::WebSearch.backend = nil
       WebMock.reset!
       Ask::WebSearch.max_retries = Ask::WebSearch::DEFAULT_MAX_RETRIES
     end
@@ -382,11 +385,25 @@ describe Ask::WebSearch do
       assert_not_requested tinyfish
     end
 
-    it "routes to SearXNG when no key is set" do
+    it "raises an onboarding error when TinyFish is selected without a key" do
+      # The describe opts in via SEARCH_BACKEND=tinyfish; no key resolves.
+      err = _(-> { Ask::WebSearch.search_raw("test") }).must_raise Ask::WebSearch::Error
+      _(err.message).must_include "agent.tinyfish.ai/api-keys"
+      _(err.message).must_include "credentials.yml"
+      _(err.message).must_include "TINYFISH_API_KEY"
+    end
+
+    it "stays on SearXNG by default even when a key is present" do
+      ENV.delete("SEARCH_BACKEND")
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      tinyfish = stub_tinyfish
       searxng = stub_request(:get, %r{localhost:8888/search})
-        .to_return(status: 200, body: '{"results": [], "unresponsive_engines": []}')
-      Ask::WebSearch.search_raw("test")
+        .to_return(status: 200, body: '{"results": [{"url": "https://sx.example", "title": "SX", "content": "c"}], "unresponsive_engines": []}')
+
+      _(Ask::WebSearch.backend).must_equal :searxng
+      _(Ask::WebSearch.search_raw("test")[:results].first[:url]).must_equal "https://sx.example"
       assert_requested searxng
+      assert_not_requested tinyfish
     end
 
     it "raises the TinyFish error when TinyFish fails and SearXNG is not configured" do
@@ -421,13 +438,43 @@ describe Ask::WebSearch do
       _(err.message).must_include "SearXNG returned 500"
     end
 
-    it "exposes the routing helpers" do
-      _(Ask::WebSearch.use_tinyfish?).must_equal false
+    it "exposes backend selection: default, env, setter, hard-off, validation" do
+      # Default path for everyone, key or not. (The describe opts in via
+      # SEARCH_BACKEND — clear it first to observe the default.)
+      ENV.delete("SEARCH_BACKEND")
       ENV["TINYFISH_API_KEY"] = "k"
-      _(Ask::WebSearch.use_tinyfish?).must_equal true
-      ENV["TINYFISH_SEARCH"] = "0"
+      _(Ask::WebSearch.backend).must_equal :searxng
       _(Ask::WebSearch.use_tinyfish?).must_equal false
 
+      # Env selection.
+      ENV["SEARCH_BACKEND"] = "tinyfish"
+      _(Ask::WebSearch.backend).must_equal :tinyfish
+      _(Ask::WebSearch.use_tinyfish?).must_equal true
+
+      # Code setter beats env; nil falls back to env/default.
+      ENV["SEARCH_BACKEND"] = "searxng"
+      Ask::WebSearch.backend = :tinyfish
+      _(Ask::WebSearch.backend).must_equal :tinyfish
+      Ask::WebSearch.backend = nil
+      _(Ask::WebSearch.backend).must_equal :searxng
+      ENV.delete("SEARCH_BACKEND")
+
+      # TINYFISH_SEARCH=0 is a hard-off — even the setter can't enable.
+      Ask::WebSearch.backend = :tinyfish
+      ENV["TINYFISH_SEARCH"] = "0"
+      _(Ask::WebSearch.backend).must_equal :searxng
+      ENV.delete("TINYFISH_SEARCH")
+      _(Ask::WebSearch.backend).must_equal :tinyfish
+    end
+
+    it "rejects an invalid backend name" do
+      ENV["SEARCH_BACKEND"] = "bing"
+      err = _(-> { Ask::WebSearch.backend }).must_raise ArgumentError
+      _(err.message).must_include "searxng, tinyfish"
+      _(-> { Ask::WebSearch.backend = :bing }).must_raise ArgumentError
+    end
+
+    it "searxng_configured? tracks setter and env" do
       _(Ask::WebSearch.searxng_configured?).must_equal false
       ENV["SEARXNG_URL"] = "http://sx.example"
       _(Ask::WebSearch.searxng_configured?).must_equal true
@@ -439,7 +486,6 @@ describe Ask::WebSearch do
     it "resolves the key through ask-auth's chain (env override)" do
       ENV["TINYFISH_API_KEY"] = "test-key"
       _(Ask::WebSearch.tinyfish_api_key).must_equal "test-key"
-      _(Ask::WebSearch.use_tinyfish?).must_equal true
     end
 
     it "returns nil from ask-auth when no env or file credential exists" do
@@ -447,7 +493,6 @@ describe Ask::WebSearch do
       # (see test_helper), so this is deterministic regardless of the
       # machine's real ~/.ask/credentials.yml.
       _(Ask::WebSearch.tinyfish_api_key).must_be_nil
-      _(Ask::WebSearch.use_tinyfish?).must_equal false
     end
   end
 

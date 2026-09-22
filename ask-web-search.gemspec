@@ -8,10 +8,11 @@ Gem::Specification.new do |spec|
 
   spec.summary = "Web search library for the ask-rb ecosystem"
   spec.description = "Web search returning results as clean numbered markdown. " \
-                     "Two backends: TinyFish's hosted API (primary with " \
-                     "TINYFISH_API_KEY — no self-hosting) and a local SearXNG " \
-                     "instance (SEARXNG_URL, also the automatic fallback). The " \
-                     "capability layer (WebSearch.search); the native " \
+                     "Two selectable backends: a local SearXNG instance " \
+                     "(SEARXNG_URL, the default path for everyone) and " \
+                     "TinyFish's hosted API (opt-in: SEARCH_BACKEND=tinyfish " \
+                     "plus a TINYFISH_API_KEY or ask-auth credentials key). " \
+                     "The capability layer (WebSearch.search); the native " \
                      "Ask::Tools::WebSearch agent tool is an optional " \
                      "integration that registers when ask-tools is present."
   spec.homepage = "https://github.com/ask-rb/ask-web-search"
