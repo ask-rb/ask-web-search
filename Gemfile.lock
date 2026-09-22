@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    ask-web-search (0.8.0)
+    ask-web-search (0.9.0)
 
 GEM
   remote: https://rubygems.org/
@@ -47,7 +47,7 @@ CHECKSUMS
   ask-auth (0.3.5) sha256=0a13bc19b1e685e8a19a2e7df6bfaecf700e144edb679bfc31397d3139b1bbb7
   ask-schema (0.1.0) sha256=ae24b2d7e63227c760457daae41b265382acbf62eb48e15ab3cf636af8a84246
   ask-tools (0.2.2) sha256=8630a5849b9dff3ff97ad240411b37ad752366cc2867e1f7add9886fdf15dbc5
-  ask-web-search (0.8.0)
+  ask-web-search (0.9.0)
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
   bigdecimal (4.1.2) sha256=53d217666027eab4280346fba98e7d5b66baaae1b9c3c1c0ffe89d48188a3fbd
   bundler (4.0.12) sha256=7f8b757d28dfb636e7b24fba2344ac6dd13b5b24f4b46d62573d483f211825ac
