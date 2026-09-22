@@ -31,6 +31,11 @@ Gem::Specification.new do |spec|
   # gem's own suite exercises the tool.
   spec.add_development_dependency "ask-tools", ">= 0.1"
 
+  # ask-auth is likewise an OPTIONAL runtime integration — the TinyFish
+  # key resolves through Ask::Auth when present (env → credentials file),
+  # raw ENV otherwise; a dev dependency so the suite exercises the chain.
+  spec.add_development_dependency "ask-auth", ">= 0.3"
+
   spec.add_development_dependency "vcr", "~> 6.0"
   spec.add_development_dependency "webmock", "~> 3.26"
   spec.add_development_dependency "minitest", "~> 5.25"

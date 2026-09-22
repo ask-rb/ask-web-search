@@ -72,13 +72,25 @@ module Ask
       "research_paper" => "research_paper"
     }.freeze
 
-    # True when TinyFish should be the primary backend: a key is present
-    # and TINYFISH_SEARCH=0 has not disabled it. Read fresh on every
-    # call so tests and config reloads don't need memo resets.
+    # The TinyFish API key: ask-auth's chain when that gem is present
+    # (env override → ~/.ask/credentials.yml → …), raw ENV otherwise.
+    # nil when nothing resolves.
+    def self.tinyfish_api_key
+      return ENV["TINYFISH_API_KEY"] unless defined?(Ask::Auth)
+
+      Ask::Auth.resolve(:tinyfish_api_key)
+    rescue Ask::Auth::MissingCredential
+      nil
+    end
+
+    # True when TinyFish should be the primary backend: a key resolves
+    # (#tinyfish_api_key) and TINYFISH_SEARCH=0 has not disabled it.
+    # Read fresh on every call so tests and config reloads don't need
+    # memo resets.
     def self.use_tinyfish?
       return false if ENV["TINYFISH_SEARCH"] == "0"
 
-      !ENV["TINYFISH_API_KEY"].to_s.empty?
+      !tinyfish_api_key.to_s.empty?
     end
 
     # True when a SearXNG endpoint was configured explicitly (SEARXNG_URL
@@ -212,7 +224,7 @@ module Ask
         http.open_timeout = 5
         http.read_timeout = 10
         req = Net::HTTP::Get.new(uri)
-        req["X-API-Key"] = ENV["TINYFISH_API_KEY"]
+        req["X-API-Key"] = tinyfish_api_key
         req["User-Agent"] = "ask-web-search/#{Ask::WebSearch::VERSION}"
         res = http.request(req)
         raise Error, "TinyFish returned #{res.code}: #{res.body[0, 200]}" unless res.code.start_with?("2")
@@ -331,4 +343,16 @@ begin
   require_relative "web_search/tool"
 rescue LoadError => e
   raise unless e.path == "ask-tools"
+end
+
+# ask-auth is an OPTIONAL credential source for the TinyFish key: when
+# present, #tinyfish_api_key resolves through Ask::Auth (env override →
+# ~/.ask/credentials.yml → …) instead of raw ENV alone, so the key can
+# live in one canonical 0600 file instead of every config that spawns a
+# server. Only the ask-auth miss is swallowed; any other LoadError is
+# real.
+begin
+  require "ask-auth"
+rescue LoadError => e
+  raise unless e.path == "ask-auth"
 end

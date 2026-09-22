@@ -435,6 +435,20 @@ describe Ask::WebSearch do
       Ask::WebSearch.searxng_url = "http://setter.example"
       _(Ask::WebSearch.searxng_configured?).must_equal true
     end
+
+    it "resolves the key through ask-auth's chain (env override)" do
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      _(Ask::WebSearch.tinyfish_api_key).must_equal "test-key"
+      _(Ask::WebSearch.use_tinyfish?).must_equal true
+    end
+
+    it "returns nil from ask-auth when no env or file credential exists" do
+      # The test chain's File provider points at a nonexistent fixture
+      # (see test_helper), so this is deterministic regardless of the
+      # machine's real ~/.ask/credentials.yml.
+      _(Ask::WebSearch.tinyfish_api_key).must_be_nil
+      _(Ask::WebSearch.use_tinyfish?).must_equal false
+    end
   end
 
   describe "retry behavior" do

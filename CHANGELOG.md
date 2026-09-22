@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+### Added
+
+- **ask-auth credential resolution for the TinyFish key.** When the
+  ask-auth gem is present (optional integration, LoadError-guarded like
+  ask-tools), the key resolves through `Ask::Auth` — env override first,
+  then `~/.ask/credentials.yml` — so it lives in one canonical 0600 file
+  instead of every config that spawns a server. Raw `ENV` remains the
+  path when ask-auth isn't installed. New
+  `Ask::WebSearch.tinyfish_api_key` returns the resolved key.
+
 ## [0.7.1] — 2026-09-22
 
 ### Fixed
