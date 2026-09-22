@@ -98,8 +98,8 @@ Ask::WebSearch.search("retrieval augmented generation", categories: "science")
 The gem returns results exactly as SearXNG produces them — it does no
 content filtering of its own. Whether adult sites appear in ordinary
 searches is decided entirely by the SearXNG instance's SafeSearch
-setting, which SearXNG defaults to **off**. To keep porn out of results,
-configure the instance:
+setting, which SearXNG defaults to **off**. To keep adult sites out of
+ordinary results, configure the instance:
 
 ```yaml
 # /etc/searxng/settings.yml
