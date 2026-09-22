@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+## [0.7.1] — 2026-09-22
+
+### Fixed
+
+- **TinyFish endpoint path.** The search call goes to the bare host root
+  (`GET https://api.search.tinyfish.ai?query=...`), as in the official
+  docs curl example — not the `/client.search.query` path carried on the
+  marketing pages, which 404s on every request. Verified live: the root
+  path answers 401 (auth-gated) for an invalid key, the old path 404s.
+
+## [0.7.0] — 2026-09-22
+
 ### Added
 
 - **TinyFish as the primary backend.** With `TINYFISH_API_KEY` set (free

@@ -292,7 +292,7 @@ describe Ask::WebSearch do
   end
 
   describe "TinyFish backend" do
-    TINYFISH = %r{api\.search\.tinyfish\.ai/client\.search\.query}
+    TINYFISH = %r{api\.search\.tinyfish\.ai}
 
     before do
       WebMock.disable_net_connect!

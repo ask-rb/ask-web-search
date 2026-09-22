@@ -48,7 +48,9 @@ module Ask
 
     # TinyFish's hosted search endpoint — the primary backend for anyone
     # holding a (free) TINYFISH_API_KEY, so no SearXNG instance is needed.
-    TINYFISH_SEARCH_URL = "https://api.search.tinyfish.ai/client.search.query"
+    # The bare host root per the official docs curl example; the
+    # /client.search.query path seen on the marketing pages 404s.
+    TINYFISH_SEARCH_URL = "https://api.search.tinyfish.ai"
 
     # Our time_range → TinyFish's recency_minutes (SearXNG's month/year
     # are approximate engine filters anyway; these are the equivalents).
