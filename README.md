@@ -3,23 +3,45 @@
 [![Gem Version](https://badge.fury.io/rb/ask-web-search.svg)](https://badge.fury.io/rb/ask-web-search)
 
 A web search tool for the ask-rb ecosystem. It provides
-`Ask::Tools::WebSearch`, which searches the web via a local
-[SearXNG](https://docs.searxng.org/) instance and returns numbered markdown
-results for LLM consumption. It has no Rails dependencies; it depends only on
-ask-tools.
+`Ask::Tools::WebSearch`, which searches the web and returns numbered
+markdown results for LLM consumption. It has no Rails dependencies; it
+depends only on ask-tools.
 
-## Prerequisites
+## Backends
 
-A running SearXNG instance. The default is `http://localhost:8888`.
+Two interchangeable backends, chosen automatically at call time:
 
-Start one with Docker:
+1. **TinyFish (recommended — no self-hosting).** Get a free API key at
+   [agent.tinyfish.ai](https://agent.tinyfish.ai/api-keys) and export it:
 
-```sh
-docker run -d --name searxng -p 8888:8080 searxng/searxng
-```
+   ```sh
+   export TINYFISH_API_KEY=...
+   ```
 
-Or use the provided `docker-compose.yml` in the `searxng` directory of this
-repository:
+   That's the whole setup — no Docker, no SearXNG instance. Live
+   browser-rendered results, freshness windows, and the news /
+   research-paper verticals all work out of the box.
+
+2. **SearXNG (self-hosted).** For users who want queries to stay local,
+   and as the automatic fallback when TinyFish fails: a running
+   [SearXNG](https://docs.searxng.org/) instance, default
+   `http://localhost:8888`. Start one with Docker:
+
+   ```sh
+   docker run -d --name searxng -p 8888:8080 searxng/searxng
+   ```
+
+   Or use the provided `docker-compose.yml` in the `searxng` directory of
+   this repository.
+
+Routing rules:
+
+- `TINYFISH_API_KEY` set → TinyFish primary; if TinyFish fails **and** a
+  SearXNG endpoint is explicitly configured, the call falls back to
+  SearXNG automatically (combined errors surface both failures).
+- No key → SearXNG only, exactly as in 0.6.x.
+- `TINYFISH_SEARCH=0` disables TinyFish outright (SearXNG only, even
+  with a key).
 
 ## Installation
 
@@ -29,13 +51,14 @@ gem "ask-web-search"
 
 ## Configuration
 
-Set the `SEARXNG_URL` environment variable to point to your SearXNG instance:
-
 ```sh
-export SEARXNG_URL=http://localhost:8888
+export TINYFISH_API_KEY=...   # TinyFish (recommended): free key, instant search
+export SEARXNG_URL=http://localhost:8888   # SearXNG endpoint (default shown)
 ```
 
-Defaults to `http://localhost:8888`.
+The SearXNG endpoint can also be set in code: `Ask::WebSearch.searxng_url=`.
+TinyFish reads `TINYFISH_API_KEY` from the environment only.
+`Ask::WebSearch.max_retries = 0` disables the retry-with-backoff loop.
 
 ## Quick Start
 
@@ -72,25 +95,30 @@ Ask::WebSearch.search("fed policy", categories: "news")
 Ask::WebSearch.search("retrieval augmented generation", categories: "science")
 ```
 
-- **`time_range:`** restricts results to a SearXNG freshness window —
-  `day`, `week`, `month`, or `year`. Anything else raises `ArgumentError`
+- **`time_range:`** restricts results to a freshness window — `day`,
+  `week`, `month`, or `year`. Anything else raises `ArgumentError`
   naming the valid values. When a windowed search comes back cleanly
   empty, the result says so — "No results found within the day freshness
   window. Retry with a broader time_range or without one." — instead of a
   bare "No results found.", and engine-failure diagnostics suggest a
-  broader window. Caveat: SearXNG delegates date filtering to the engines,
-  and as of SearXNG 2026.6.x every date-capable engine returns zero
-  results under a date filter, so windows currently fail soft with that
-  message. No gem change is needed when the engines are fixed upstream.
-- **`categories:`** scopes the search to a SearXNG category — `news`,
-  `science` (research papers), or any category the instance configures.
-  Accepts a string or anything Array-able (`[:news, :science]` →
-  `news,science`). Values pass through unvalidated: instances configure
-  their own category set, and an unknown category degrades to a clean
-  empty result rather than a failure. The instance must have vertical
-  engines enabled — the `searxng/` compose config in this repository
-  enables bing news + google news (news) and arxiv + pubmed (science);
-  without them SearXNG silently resolves the request against the general
+  broader window. TinyFish maps this to its `recency_minutes` and
+  honors it properly. Caveat on the **SearXNG backend**: SearXNG
+  delegates date filtering to the engines, and as of SearXNG 2026.6.x
+  every date-capable engine returns zero results under a date filter, so
+  windows there fail soft with that message. No gem change is needed
+  when the engines are fixed upstream.
+- **`categories:`** scopes the search to a vertical — `news`, `science`
+  (research papers), or general web (default). Accepts a string or
+  anything Array-able (`[:news, :science]` → `news,science`). TinyFish
+  maps the first recognized value to its `domain_type`
+  (general→web, news→news, science→research_paper; unknown categories
+  are omitted so TinyFish defaults to web). On the **SearXNG backend**
+  values pass through unvalidated: instances configure their own
+  category set, and an unknown category degrades to a clean empty
+  result rather than a failure. The instance must have vertical engines
+  enabled — the `searxng/` compose config in this repository enables
+  bing news + google news (news) and arxiv + pubmed (science); without
+  them SearXNG silently resolves the request against the general
   engines.
 
 ## SafeSearch and adult content

@@ -6,11 +6,14 @@ require "json"
 require_relative "web_search/version"
 
 module Ask
-  # Searches the web via a local SearXNG instance and returns the results
-  # as clean, numbered markdown for LLM consumption. The capability layer:
-  # one entry point (WebSearch.search) and a configurable endpoint. Tool
-  # framing — name, parameter schema, result wrapping — lives with the
-  # consumers (the MCP server, the agents) that call this library.
+  # Searches the web and returns the results as clean, numbered markdown
+  # for LLM consumption. Two interchangeable backends: TinyFish's hosted
+  # search API — primary when TINYFISH_API_KEY is set, so newcomers need
+  # no self-hosted infrastructure — and a local SearXNG instance for
+  # self-hosters, which is also the automatic fallback when TinyFish
+  # fails. The capability layer: one entry point (WebSearch.search).
+  # Tool framing — name, parameter schema, result wrapping — lives with
+  # the consumers (the MCP server, the agents) that call this library.
   module WebSearch
     # Search errors that carry engine diagnostics — the agent needs to
     # know *which* engines failed and *why* (CAPTCHA, timeout, suspended)
@@ -30,6 +33,7 @@ module Ask
 
     def self.searxng_url=(url)
       @searxng_url = url
+      @searxng_url_set = !url.nil?
     end
 
     # Retry configuration. Set max_retries to 0 to disable retries.
@@ -41,6 +45,49 @@ module Ask
     # fails with a message listing these instead of silently searching
     # unfiltered.
     TIME_RANGES = %w[day week month year].freeze
+
+    # TinyFish's hosted search endpoint — the primary backend for anyone
+    # holding a (free) TINYFISH_API_KEY, so no SearXNG instance is needed.
+    TINYFISH_SEARCH_URL = "https://api.search.tinyfish.ai/client.search.query"
+
+    # Our time_range → TinyFish's recency_minutes (SearXNG's month/year
+    # are approximate engine filters anyway; these are the equivalents).
+    TIME_RANGE_TO_MINUTES = {
+      "day" => 1440,
+      "week" => 10_080,
+      "month" => 43_200,
+      "year" => 525_600
+    }.freeze
+
+    # Our categories → TinyFish's single-value domain_type. The FIRST
+    # recognized value wins (TinyFish is one-domain-per-query); unknown
+    # categories are omitted so TinyFish falls back to its web default.
+    CATEGORIES_TO_DOMAIN_TYPE = {
+      "general" => "web",
+      "web" => "web",
+      "news" => "news",
+      "science" => "research_paper",
+      "research_paper" => "research_paper"
+    }.freeze
+
+    # True when TinyFish should be the primary backend: a key is present
+    # and TINYFISH_SEARCH=0 has not disabled it. Read fresh on every
+    # call so tests and config reloads don't need memo resets.
+    def self.use_tinyfish?
+      return false if ENV["TINYFISH_SEARCH"] == "0"
+
+      !ENV["TINYFISH_API_KEY"].to_s.empty?
+    end
+
+    # True when a SearXNG endpoint was configured explicitly (SEARXNG_URL
+    # or searxng_url=). Gates the TinyFish → SearXNG fallback so a failed
+    # TinyFish search never probes a default localhost instance that may
+    # not exist.
+    def self.searxng_configured?
+      return true if @searxng_url_set
+
+      !ENV["SEARXNG_URL"].to_s.empty?
+    end
 
     def self.max_retries
       return @max_retries if defined?(@max_retries)
@@ -89,22 +136,43 @@ module Ask
       search_raw(query, time_range: time_range, categories: categories)[:results]
     end
 
-    # The full SearXNG response: { results: [...], unresponsive: [[name,
-    # reason], ...] }. Same retry logic as #search_results, but preserves
-    # the engine diagnostics the caller needs to explain an empty result.
-    # time_range / categories are normalized here — the single point that
-    # builds the request — and are idempotent, so callers may pass raw or
-    # already-normalized values.
+    # The full response: { results: [...], unresponsive: [[name,
+    # reason], ...] }. Routes to TinyFish when #use_tinyfish?, falling
+    # back to SearXNG (only when explicitly configured) if TinyFish
+    # raises; otherwise straight to SearXNG — byte-for-byte the 0.6.x
+    # behavior for keyless users. Same retry logic either way, but
+    # preserves the engine diagnostics the caller needs to explain an
+    # empty result. time_range / categories are normalized by the
+    # backends that build requests — idempotent, so callers may pass
+    # raw or already-normalized values.
     def self.search_raw(query, time_range: nil, categories: nil)
+      return searxng_search_raw(query, time_range: time_range, categories: categories) unless use_tinyfish?
+
+      begin
+        tinyfish_search_raw(query, time_range: time_range, categories: categories)
+      rescue StandardError => primary_error
+        raise primary_error unless searxng_configured?
+
+        begin
+          searxng_search_raw(query, time_range: time_range, categories: categories)
+        rescue StandardError => fallback_error
+          raise Error, "search failed: TinyFish → #{primary_error.message}; " \
+                       "SearXNG fallback → #{fallback_error.message}"
+        end
+      end
+    end
+
+    # The SearXNG backend: GET {searxng_url}/search with the metasearch
+    # params, parsed into { results:, unresponsive: }. Call directly to
+    # bypass the router (and any TinyFish routing/fallback).
+    def self.searxng_search_raw(query, time_range: nil, categories: nil)
       params = { q: query, format: "json" }
       params[:time_range] = normalize_time_range(time_range) if time_range
       params[:categories] = normalize_categories(categories) if categories
       uri = URI("#{searxng_url}/search")
       uri.query = URI.encode_www_form(params)
-      retries = max_retries || 0
-      attempt = 0
-      begin
-        attempt += 1
+
+      with_retries do
         http = Net::HTTP.new(uri.host, uri.port)
         http.open_timeout = 5
         http.read_timeout = 10
@@ -114,11 +182,44 @@ module Ask
         raise "SearXNG returned #{res.code}: #{res.body}" unless res.code.start_with?("2")
 
         parse_response(JSON.parse(res.body))
-      rescue StandardError
-        raise if attempt > retries
+      end
+    end
 
-        sleep RETRY_BACKOFF[[attempt - 1, RETRY_BACKOFF.size - 1].min]
-        retry
+    # The TinyFish backend: GET the hosted search API (needs
+    # TINYFISH_API_KEY), normalized into the same { results:,
+    # unresponsive: } contract — snippet → content; a single hosted
+    # API has no per-engine status, so unresponsive is always empty
+    # (transport failures raise instead, which the router's fallback
+    # catches). time_range maps to recency_minutes; the FIRST
+    # recognized categories value maps to domain_type.
+    def self.tinyfish_search_raw(query, time_range: nil, categories: nil)
+      params = { query: query }
+      normalized_range = normalize_time_range(time_range)
+      params[:recency_minutes] = TIME_RANGE_TO_MINUTES[normalized_range] if normalized_range
+      normalized_categories = normalize_categories(categories)
+      if normalized_categories
+        domain = CATEGORIES_TO_DOMAIN_TYPE[normalized_categories.split(",").first]
+        params[:domain_type] = domain if domain
+      end
+      uri = URI(TINYFISH_SEARCH_URL)
+      uri.query = URI.encode_www_form(params)
+
+      with_retries do
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = true
+        http.open_timeout = 5
+        http.read_timeout = 10
+        req = Net::HTTP::Get.new(uri)
+        req["X-API-Key"] = ENV["TINYFISH_API_KEY"]
+        req["User-Agent"] = "ask-web-search/#{Ask::WebSearch::VERSION}"
+        res = http.request(req)
+        raise Error, "TinyFish returned #{res.code}: #{res.body[0, 200]}" unless res.code.start_with?("2")
+
+        data = JSON.parse(res.body)
+        results = data.fetch("results", []).map do |r|
+          { url: r["url"], title: r["title"], content: r["snippet"] }
+        end
+        { results: results, unresponsive: [] }
       end
     end
 
@@ -159,6 +260,24 @@ module Ask
       value = Array(categories).map { |c| c.to_s.strip.downcase }.reject(&:empty?).uniq.join(",")
       value.empty? ? nil : value
     end
+
+    # Retries the block up to max_retries times on any StandardError
+    # with exponential backoff (RETRY_BACKOFF). Param building and
+    # validation happen OUTSIDE the block in the backends, so an
+    # ArgumentError never sleeps and retries.
+    def self.with_retries
+      attempt = 0
+      begin
+        attempt += 1
+        yield
+      rescue StandardError
+        raise if attempt > (max_retries || 0)
+
+        sleep RETRY_BACKOFF[[attempt - 1, RETRY_BACKOFF.size - 1].min]
+        retry
+      end
+    end
+    private_class_method :with_retries
 
     # Parses the full SearXNG JSON response into { results:, unresponsive: }.
     # results are { url:, title:, content: } entries from results and

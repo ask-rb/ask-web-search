@@ -291,6 +291,152 @@ describe Ask::WebSearch do
     end
   end
 
+  describe "TinyFish backend" do
+    TINYFISH = %r{api\.search\.tinyfish\.ai/client\.search\.query}
+
+    before do
+      WebMock.disable_net_connect!
+      Ask::WebSearch.max_retries = 0
+      Ask::WebSearch.searxng_url = nil
+      @saved = %w[TINYFISH_API_KEY TINYFISH_SEARCH SEARXNG_URL].to_h { |k| [k, ENV.delete(k)] }
+    end
+
+    after do
+      @saved.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
+      Ask::WebSearch.searxng_url = nil
+      WebMock.reset!
+      Ask::WebSearch.max_retries = Ask::WebSearch::DEFAULT_MAX_RETRIES
+    end
+
+    def stub_tinyfish(results: [], status: 200, body: nil, query: nil, headers: nil)
+      body ||= JSON.generate("results" => results)
+      matcher = {}
+      matcher[:query] = query if query
+      matcher[:headers] = headers if headers
+      stub = stub_request(:get, TINYFISH)
+      stub = stub.with(**matcher) unless matcher.empty?
+      stub.to_return(status: status, body: body)
+    end
+
+    it "routes to TinyFish when a key is set and normalizes its response shape" do
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      stub = stub_tinyfish(results: [{ "url" => "https://example.com", "title" => "TF", "snippet" => "Tiny snippet" }],
+                           query: { "query" => "test" },
+                           headers: { "X-API-Key" => "test-key" })
+
+      response = Ask::WebSearch.search_raw("test")
+      _(response[:results]).must_equal [{ url: "https://example.com", title: "TF", content: "Tiny snippet" }]
+      _(response[:unresponsive]).must_be :empty?
+      assert_requested stub
+    end
+
+    it "maps time_range to recency_minutes" do
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      stub = stub_tinyfish(query: { "query" => "test", "recency_minutes" => "10080" })
+      Ask::WebSearch.search_raw("test", time_range: "week")
+      assert_requested stub
+    end
+
+    it "maps categories to domain_type" do
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      news = stub_tinyfish(query: { "query" => "test", "domain_type" => "news" })
+      science = stub_tinyfish(query: { "query" => "test", "domain_type" => "research_paper" })
+      Ask::WebSearch.search_raw("test", categories: "news")
+      Ask::WebSearch.search_raw("test", categories: "science")
+      assert_requested news
+      assert_requested science
+    end
+
+    it "omits domain_type for categories TinyFish has no mapping for" do
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      stub = stub_tinyfish(query: { "query" => "test" })
+      Ask::WebSearch.search_raw("test", categories: "images")
+      assert_requested stub
+    end
+
+    it "rejects an invalid time_range before hitting TinyFish" do
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      err = _(-> { Ask::WebSearch.search_raw("test", time_range: "fortnight") }).must_raise ArgumentError
+      _(err.message).must_include "day, week, month, year"
+    end
+
+    it "formats TinyFish results as numbered markdown through search()" do
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      stub_tinyfish(results: [{ "url" => "https://example.com", "title" => "TF", "snippet" => "s" }],
+                    query: { "query" => "ruby" })
+      markdown = Ask::WebSearch.search("ruby")
+      _(markdown).must_match(/^1\. TF$/)
+      _(markdown).must_include "https://example.com"
+      _(markdown).must_include "s"
+    end
+
+    it "routes to SearXNG when TINYFISH_SEARCH=0 even with a key" do
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      ENV["TINYFISH_SEARCH"] = "0"
+      tinyfish = stub_tinyfish
+      searxng = stub_request(:get, %r{localhost:8888/search})
+        .to_return(status: 200, body: '{"results": [{"url": "https://sx.example", "title": "SX", "content": "c"}]}')
+
+      _(Ask::WebSearch.search_raw("test")[:results].first[:url]).must_equal "https://sx.example"
+      assert_requested searxng
+      assert_not_requested tinyfish
+    end
+
+    it "routes to SearXNG when no key is set" do
+      searxng = stub_request(:get, %r{localhost:8888/search})
+        .to_return(status: 200, body: '{"results": [], "unresponsive_engines": []}')
+      Ask::WebSearch.search_raw("test")
+      assert_requested searxng
+    end
+
+    it "raises the TinyFish error when TinyFish fails and SearXNG is not configured" do
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      stub_tinyfish(status: 401, body: "bad key")
+      err = _(-> { Ask::WebSearch.search_raw("test") }).must_raise Ask::WebSearch::Error
+      _(err.message).must_include "TinyFish returned 401"
+    end
+
+    it "falls back to a configured SearXNG when TinyFish fails" do
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      Ask::WebSearch.searxng_url = "http://searxng.test"
+      stub_tinyfish(status: 503, body: "maintenance")
+      stub_request(:get, %r{searxng.test/search}).to_return(
+        status: 200,
+        body: '{"results": [{"url": "https://fb.example", "title": "Fallback", "content": "from searxng"}], "unresponsive_engines": []}'
+      )
+
+      response = Ask::WebSearch.search_raw("test")
+      _(response[:results].first[:url]).must_equal "https://fb.example"
+    end
+
+    it "surfaces both backend failures when TinyFish and the fallback both fail" do
+      ENV["TINYFISH_API_KEY"] = "test-key"
+      Ask::WebSearch.searxng_url = "http://searxng.test"
+      stub_tinyfish(status: 503, body: "maintenance")
+      stub_request(:get, %r{searxng.test/search}).to_return(status: 500, body: "boom")
+
+      err = _(-> { Ask::WebSearch.search_raw("test") }).must_raise Ask::WebSearch::Error
+      _(err.message).must_include "TinyFish returned 503"
+      _(err.message).must_include "SearXNG fallback"
+      _(err.message).must_include "SearXNG returned 500"
+    end
+
+    it "exposes the routing helpers" do
+      _(Ask::WebSearch.use_tinyfish?).must_equal false
+      ENV["TINYFISH_API_KEY"] = "k"
+      _(Ask::WebSearch.use_tinyfish?).must_equal true
+      ENV["TINYFISH_SEARCH"] = "0"
+      _(Ask::WebSearch.use_tinyfish?).must_equal false
+
+      _(Ask::WebSearch.searxng_configured?).must_equal false
+      ENV["SEARXNG_URL"] = "http://sx.example"
+      _(Ask::WebSearch.searxng_configured?).must_equal true
+      ENV.delete("SEARXNG_URL")
+      Ask::WebSearch.searxng_url = "http://setter.example"
+      _(Ask::WebSearch.searxng_configured?).must_equal true
+    end
+  end
+
   describe "retry behavior" do
     before do
       WebMock.disable_net_connect!

@@ -7,11 +7,13 @@ Gem::Specification.new do |spec|
   spec.email = ["kaka@myrrlabs.com"]
 
   spec.summary = "Web search library for the ask-rb ecosystem"
-  spec.description = "Searches the web via a local SearXNG instance and returns " \
-                     "the results as clean numbered markdown. The capability " \
-                     "layer (WebSearch.search); the native Ask::Tools::WebSearch " \
-                     "agent tool is an optional integration that registers when " \
-                     "ask-tools is present. Configure endpoint via SEARXNG_URL env var."
+  spec.description = "Web search returning results as clean numbered markdown. " \
+                     "Two backends: TinyFish's hosted API (primary with " \
+                     "TINYFISH_API_KEY — no self-hosting) and a local SearXNG " \
+                     "instance (SEARXNG_URL, also the automatic fallback). The " \
+                     "capability layer (WebSearch.search); the native " \
+                     "Ask::Tools::WebSearch agent tool is an optional " \
+                     "integration that registers when ask-tools is present."
   spec.homepage = "https://github.com/ask-rb/ask-web-search"
   spec.license = "MIT"
 

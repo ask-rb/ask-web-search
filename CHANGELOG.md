@@ -1,3 +1,31 @@
+## [Unreleased]
+
+### Added
+
+- **TinyFish as the primary backend.** With `TINYFISH_API_KEY` set (free
+  key, zero self-hosted infrastructure), searches route to TinyFish's
+  hosted API first — the gem now works out of the box for newcomers who
+  don't want to run SearXNG. When TinyFish fails and a SearXNG endpoint
+  is explicitly configured (`SEARXNG_URL` or `searxng_url=`), the call
+  falls back to SearXNG automatically; if both fail, one error surfaces
+  both messages. No key → SearXNG only, byte-for-byte the 0.6.x
+  behavior. `TINYFISH_SEARCH=0` disables TinyFish even with a key.
+- Param mapping: `time_range` → TinyFish `recency_minutes`
+  (day/week/month/year → 1440/10080/43200/525600) and the first
+  recognized `categories` value → `domain_type` (general→web, news→news,
+  science→research_paper; unknown categories omitted so TinyFish
+  defaults to web).
+- `Ask::WebSearch.use_tinyfish?` / `.searxng_configured?` routing
+  introspection.
+
+### Changed
+
+- The retry-with-backoff loop was extracted into a shared private
+  `with_retries` (param validation still happens before it, so an
+  invalid `time_range` never sleeps and retries), and the SearXNG
+  request logic moved to `searxng_search_raw`. Both backends are
+  directly callable and honor `max_retries`.
+
 ## [0.6.0] — 2026-09-19
 
 ### Added
